@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+jinja2
+weasyprint
+qrbill
+svglib
+reportlab
+python-multipart
+

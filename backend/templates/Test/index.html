@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fattura {{ invoice_number }}</title>
+  <link rel="stylesheet" href="style.css" type="text/css" media="all" />
+  <style>
+    body,
+    html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+
+    .a4-wrapper {
+      min-height: 297mm;
+      position: relative;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding-bottom: 85mm;
+    }
+
+    .content-area {
+      flex: 1 1 auto;
+      padding-bottom: 0;
+    }
+
+    .footer-area {
+      flex-shrink: 0;
+      position: relative;
+      z-index: 2;
+    }
+
+    .qr-footer-img {
+      width: 100%;
+      display: block;
+      margin: 0;
+      position: absolute;
+      left: 0;
+      bottom: -65px;
+      z-index: 1;
+
+    }
+  </style>
+</head>
+
+<body>
+  <div class="a4-wrapper">
+    <div class="content-area">
+      <div class="py-4">
+        <div class="px-14 py-6">
+          <table class="w-full border-collapse border-spacing-0">
+            <tbody>
+              <tr>
+                <td style="vertical-align: middle;">
+                  <div
+                    style="width: {{ logo_box_width }}px; height: {{ logo_box_height }}px; background: transparent; display: flex; align-items: center; justify-content: center; border-radius: 8px; overflow: hidden;">
+                    <img src="{{logo}}" alt="Logo" style="object-fit: cover; width: 100%; height: 100%;" />
+                  </div>
+                </td>
+                <td style="vertical-align: middle; text-align: right;">
+                  <div class="text-sm" style="display: inline-block; text-align: right;">
+                    <table class="border-collapse border-spacing-0" style="margin-left: auto;">
+                      <tbody>
+                        <tr>
+                          <td class="border-r pr-4">
+                            <div>
+                              <p class="whitespace-nowrap text-slate-400 text-right">Data</p>
+                              <p class="whitespace-nowrap font-bold text-main text-right">{{ invoice_date }}</p>
+                            </div>
+                          </td>
+                          <td class="pl-4">
+                            <div>
+                              <p class="whitespace-nowrap text-slate-400 text-right">Fattura n°</p>
+                              <p class="whitespace-nowrap font-bold text-main text-right">{{ invoice_number }}</p>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="bg-slate-100 px-14 py-6 text-sm">
+          <table class="w-full border-collapse border-spacing-0">
+            <tbody>
+              <tr>
+                <td class="w-1/2 align-top">
+                  <div class="text-sm text-neutral-600">
+                    <p class="font-bold">Company SA</p>
+                    <p>Bogus street</p>
+                    <p>1234 Zurich</p>
+                    <p>contact@email.com</p>
+                    <p>IBAN: CH01 1234 5678 9876 5432 1</p>
+                  </div>
+                </td>
+                <td class="w-1/2 align-top text-right">
+                  <div class="text-sm text-neutral-600">
+                    <p class="font-bold">{{ customer.name }}</p>
+                    <p>{{ customer.address }}</p>
+                    <p>{{ customer.city }}, {{ customer.zip }}</p>
+                    <p>{{ customer.country }}</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-14 py-10 text-sm text-neutral-700">
+          <table class="w-full border-collapse border-spacing-0">
+            <thead>
+              <tr>
+                <td class="border-b-2 border-main pb-3 pl-3 font-bold text-main">#</td>
+                <td class="border-b-2 border-main pb-3 pl-2 font-bold text-main">Dettagli prodotto</td>
+                <td class="border-b-2 border-main pb-3 pl-2 text-right font-bold text-main">Prezzo</td>
+                <td class="border-b-2 border-main pb-3 pl-2 text-center font-bold text-main">Quantità</td>
+                <td class="border-b-2 border-main pb-3 pl-2 pr-3 text-right font-bold text-main">Totale</td>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+              <tr>
+                <td class="border-b py-3 pl-3">{{ loop.index }}.</td>
+                <td class="border-b py-3 pl-2">{{ item.desc }}</td>
+                <td class="border-b py-3 pl-2 text-right">CHF {{ item.price }}</td>
+                <td class="border-b py-3 pl-2 text-center">{{ item.qty }}</td>
+                <td class="border-b py-3 pl-1 pr-2 text-right">CHF {{ item.total }}</td>
+              </tr>
+              {% endfor %}
+              <tr>
+                <td colspan="6">
+                  <table class="w-full border-collapse border-spacing-0">
+                    <tbody>
+                      <tr>
+                        <td class="w-full"></td>
+                        <td>
+                          <table class="w-full border-collapse border-spacing-0">
+                            <tbody>
+                              <tr>
+                                <td class="bg-main p-3">
+                                  <div class="whitespace-nowrap font-bold text-white">Totale:</div>
+                                </td>
+                                <td class="bg-main p-3 text-right">
+                                  <div class="whitespace-nowrap font-bold text-white">CHF {{ total }}</div>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Notes and Thank You moved to footer-area below -->
+      </div>
+    </div>
+    <!-- BEGIN: Footer Area (always at bottom, above QR) -->
+    <div class="footer-area">
+      <div class="px-14 py-6 text-sm text-neutral-700">
+        <p class="text-main font-bold">Note</p>
+        <p class="italic">{{ notes }}</p>
+      </div>
+      <div class="px-14 py-4 text-center text-lg text-main font-bold">
+        {{ thank_you_message }}
+      </div>
+    </div>
+    <!-- END: Footer Area -->
+    <img src="{{qr_image}}" alt="Codice QR" class="qr-footer-img" />
+  </div>
+</body>
+
+</html>
