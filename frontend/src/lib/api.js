@@ -107,16 +107,13 @@ export async function getTemplateFields(id) {
 export async function getInvoices() {
   return fetch(`${API}/invoices`).then(r => r.json());
 }
-export async function createInvoice(client_id, template_id, data, logoFile, payment_event_id = null) {
+export async function createInvoice(client_id, template_id, data, logoFile) {
   const form = new FormData();
   form.append("client_id", client_id);
   form.append("template_id", template_id);
   form.append("data", JSON.stringify(data));
   if (logoFile) {
     form.append("logo_file", logoFile);
-  }
-  if (payment_event_id) {
-    form.append("payment_event_id", payment_event_id);
   }
   return fetch(`${API}/invoices`, { method: "POST", body: form }).then(r => r.json());
 }

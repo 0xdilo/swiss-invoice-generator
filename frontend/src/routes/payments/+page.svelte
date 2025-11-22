@@ -28,13 +28,18 @@
 
   onMount(load);
 
+  async function markAsSent(eventId) {
+    await updatePaymentEvent(eventId, { status: "sent" });
+    await loadEvents();
+  }
+
   async function markAsPaid(eventId) {
     await updatePaymentEvent(eventId, { status: "paid" });
     await loadEvents();
   }
 
-  async function markAsPending(eventId) {
-    await updatePaymentEvent(eventId, { status: "pending", paid_date: null });
+  async function markAsNotSent(eventId) {
+    await updatePaymentEvent(eventId, { status: "not_sent" });
     await loadEvents();
   }
 
@@ -70,12 +75,13 @@
 
   $: pastEvents = events.filter((e) => isPast(e.due_date));
   $: futureEvents = events.filter((e) => isFuture(e.due_date));
-  $: pendingCount = events.filter((e) => e.status === "pending").length;
+  $: notSentCount = events.filter((e) => e.status === "not_sent").length;
+  $: sentCount = events.filter((e) => e.status === "sent").length;
   $: overdueCount = events.filter((e) =>
     isOverdue(e.due_date, e.status)
   ).length;
-  $: totalPending = events
-    .filter((e) => e.status === "pending")
+  $: totalUnpaid = events
+    .filter((e) => e.status !== "paid")
     .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
 </script>
 
@@ -83,16 +89,20 @@
 
 <div class="stats">
   <div class="stat-card">
-    <div class="stat-value">{pendingCount}</div>
-    <div class="stat-label">Pending Payments</div>
+    <div class="stat-value">{notSentCount}</div>
+    <div class="stat-label">Not Sent</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{sentCount}</div>
+    <div class="stat-label">Sent</div>
   </div>
   <div class="stat-card">
     <div class="stat-value">{overdueCount}</div>
     <div class="stat-label">Overdue</div>
   </div>
   <div class="stat-card">
-    <div class="stat-value">{totalPending.toFixed(2)} CHF</div>
-    <div class="stat-label">Total Pending</div>
+    <div class="stat-value">{totalUnpaid.toFixed(2)} CHF</div>
+    <div class="stat-label">Total Unpaid</div>
   </div>
 </div>
 
@@ -119,7 +129,8 @@
       on:change={loadEvents}
     >
       <option value="">All Statuses</option>
-      <option value="pending">Pending</option>
+      <option value="not_sent">Not Sent</option>
+      <option value="sent">Sent</option>
       <option value="paid">Paid</option>
     </select>
   </div>
@@ -147,14 +158,22 @@
             <div class="event-description">{event.description}</div>
           {/if}
           <div class="event-actions">
-            {#if event.status === "pending"}
+            {#if event.status === "not_sent"}
+              <button class="mark-sent-btn" on:click={() => markAsSent(event.id)}
+                >Mark as Sent</button
+              >
+            {:else if event.status === "sent"}
               <button class="mark-paid-btn" on:click={() => markAsPaid(event.id)}
                 >Mark as Paid</button
               >
-            {:else}
               <button
-                class="mark-pending-btn"
-                on:click={() => markAsPending(event.id)}>Unmark</button
+                class="mark-not-sent-btn"
+                on:click={() => markAsNotSent(event.id)}>Back to Not Sent</button
+              >
+            {:else if event.status === "paid"}
+              <button
+                class="mark-sent-btn"
+                on:click={() => markAsSent(event.id)}>Back to Sent</button
               >
             {/if}
             {#if event.invoice_id}
@@ -206,14 +225,22 @@
             <div class="paid-info">Paid on: {formatDate(event.paid_date)}</div>
           {/if}
           <div class="event-actions">
-            {#if event.status === "pending"}
+            {#if event.status === "not_sent"}
+              <button class="mark-sent-btn" on:click={() => markAsSent(event.id)}
+                >Mark as Sent</button
+              >
+            {:else if event.status === "sent"}
               <button class="mark-paid-btn" on:click={() => markAsPaid(event.id)}
                 >Mark as Paid</button
               >
-            {:else}
               <button
-                class="mark-pending-btn"
-                on:click={() => markAsPending(event.id)}>Unmark</button
+                class="mark-not-sent-btn"
+                on:click={() => markAsNotSent(event.id)}>Back to Not Sent</button
+              >
+            {:else if event.status === "paid"}
+              <button
+                class="mark-sent-btn"
+                on:click={() => markAsSent(event.id)}>Back to Sent</button
               >
             {/if}
             {#if event.invoice_id}
@@ -416,7 +443,12 @@
     text-transform: uppercase;
   }
 
-  .status-badge.pending {
+  .status-badge.not_sent {
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
+
+  .status-badge.sent {
     background-color: #fef3c7;
     color: #92400e;
   }
@@ -476,14 +508,26 @@
     background-color: #45a049;
   }
 
-  .mark-pending-btn {
-    background-color: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fcd34d;
+  .mark-sent-btn {
+    background-color: #fbbf24;
+    color: #78350f;
+    border: 1px solid #f59e0b;
   }
 
-  .mark-pending-btn:hover {
-    background-color: #fde68a;
+  .mark-sent-btn:hover {
+    background-color: #f59e0b;
+    color: white;
+  }
+
+  .mark-not-sent-btn {
+    background-color: #fecaca;
+    color: #991b1b;
+    border: 1px solid #f87171;
+  }
+
+  .mark-not-sent-btn:hover {
+    background-color: #f87171;
+    color: white;
   }
 
   .invoice-link {

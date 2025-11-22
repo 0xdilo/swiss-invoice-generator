@@ -7,7 +7,6 @@
     getInvoices,
     updateInvoice,
     deleteInvoice,
-    getPaymentEvents,
   } from "$lib/api.js";
   import { onMount } from "svelte";
   let clients = [],
@@ -22,9 +21,6 @@
   let editing = null;
   let logoUploadFile = null;
   let showLogoUploadUI = false;
-  let linkToPaymentEvent = false;
-  let selectedPaymentEventId = "";
-  let paymentEvents = [];
 
   const AUTO_FIELDS = [
     "client",
@@ -65,15 +61,6 @@
     showLogoUploadUI = false;
   }
 
-  $: if (client_id && linkToPaymentEvent) {
-    getPaymentEvents(parseInt(client_id), "pending").then((events) => {
-      paymentEvents = events;
-    });
-  } else {
-    paymentEvents = [];
-    selectedPaymentEventId = "";
-  }
-
   function addItem() {
     items = [...items, { desc: "", price: 0, qty: 1 }];
   }
@@ -103,15 +90,11 @@
       invoiceUrl = `http://localhost:8000/invoices/${res.id}/pdf?t=${Date.now()}`;
       editing = null;
     } else {
-      const paymentEventId = linkToPaymentEvent && selectedPaymentEventId
-        ? parseInt(selectedPaymentEventId)
-        : null;
       const res = await createInvoice(
         client_id,
         template_id,
         data,
         logoUploadFile ? logoUploadFile[0] : null,
-        paymentEventId,
       );
       invoiceUrl = `http://localhost:8000/invoices/${res.id}/pdf?t=${Date.now()}`;
     }
@@ -120,8 +103,6 @@
     client_id = "";
     template_id = "";
     logoUploadFile = null;
-    linkToPaymentEvent = false;
-    selectedPaymentEventId = "";
     await load();
   }
 
@@ -162,38 +143,6 @@
       {/each}
     </select>
   </div>
-
-  {#if editing === null}
-    <div class="form-group payment-link-section">
-      <label class="checkbox-label">
-        <input
-          type="checkbox"
-          bind:checked={linkToPaymentEvent}
-        />
-        Link to payment event
-      </label>
-      {#if linkToPaymentEvent}
-        <div class="payment-event-selector">
-          <label for="payment-event-select">Select Payment Event</label>
-          <select
-            id="payment-event-select"
-            bind:value={selectedPaymentEventId}
-            required={linkToPaymentEvent}
-          >
-            <option value="" disabled selected>Select a pending payment</option>
-            {#each paymentEvents as event}
-              <option value={event.id}>
-                {event.description || "Payment"} - {event.amount} {event.currency} - Due: {event.due_date}
-              </option>
-            {/each}
-          </select>
-          {#if paymentEvents.length === 0 && client_id}
-            <p class="info-text">No pending payment events for this client.</p>
-          {/if}
-        </div>
-      {/if}
-    </div>
-  {/if}
 
   {#if showLogoUploadUI}
     <div class="form-group">
@@ -603,39 +552,6 @@
   .actions .delete-btn:hover {
     background-color: #e53e3e;
     color: white;
-  }
-
-  .payment-link-section {
-    background-color: #f0f7ff;
-    padding: 1rem;
-    border-radius: 6px;
-    border: 1px solid #d0e7ff;
-  }
-
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 500;
-    color: var(--text-primary-color);
-    cursor: pointer;
-  }
-
-  .checkbox-label input[type="checkbox"] {
-    width: auto;
-    cursor: pointer;
-    margin: 0;
-  }
-
-  .payment-event-selector {
-    margin-top: 1rem;
-  }
-
-  .info-text {
-    margin-top: 0.5rem;
-    font-size: 0.875rem;
-    color: var(--text-secondary-color);
-    font-style: italic;
   }
 
   @media (max-width: 700px) {

@@ -71,7 +71,7 @@ def init_db():
             currency TEXT DEFAULT 'CHF',
             due_date TEXT,
             description TEXT,
-            status TEXT DEFAULT 'pending',
+            status TEXT DEFAULT 'not_sent',
             invoice_id INTEGER,
             paid_date TEXT,
             FOREIGN KEY (client_id) REFERENCES clients(id),
@@ -219,6 +219,9 @@ def get_recurring_fees(client_id: int):
 
 @app.post("/clients/{client_id}/recurring-fees")
 def add_recurring_fee(client_id: int, fee: dict):
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
+
     with db() as conn:
         c = conn.cursor()
         c.execute(
@@ -226,7 +229,75 @@ def add_recurring_fee(client_id: int, fee: dict):
             (client_id, fee["amount"], fee.get("currency", "CHF"), fee["frequency"], fee["start_date"], fee.get("description", ""))
         )
         conn.commit()
-        return {"id": c.lastrowid}
+        recurring_fee_id = c.lastrowid
+
+        # Auto-generate payment events from start date to next future occurrence
+        start_date_str = fee["start_date"]
+        try:
+            if "." in start_date_str:
+                parts = start_date_str.split(".")
+                start_date = datetime(int(parts[2]), int(parts[1]), int(parts[0]))
+            elif "/" in start_date_str:
+                parts = start_date_str.split("/")
+                start_date = datetime(int(parts[2]), int(parts[1]), int(parts[0]))
+            else:
+                start_date = datetime.fromisoformat(start_date_str[:10])
+        except:
+            return {"id": recurring_fee_id}
+
+        current_date = datetime.now()
+        next_date = start_date
+
+        # Generate all events from start_date until the next future occurrence
+        if fee["frequency"] == "monthly":
+            while next_date <= current_date:
+                # Create event for this date
+                due_date_str = next_date.strftime("%Y-%m-%d")
+                c.execute("SELECT COUNT(*) FROM payment_events WHERE recurring_fee_id=? AND due_date=?",
+                         (recurring_fee_id, due_date_str))
+                if c.fetchone()[0] == 0:
+                    c.execute(
+                        "INSERT INTO payment_events (client_id, recurring_fee_id, amount, currency, due_date, description, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (client_id, recurring_fee_id, fee["amount"], fee.get("currency", "CHF"),
+                         due_date_str, fee.get("description", ""), "not_sent")
+                    )
+                next_date = next_date + relativedelta(months=1)
+            # Add one more future occurrence
+            due_date_str = next_date.strftime("%Y-%m-%d")
+            c.execute(
+                "INSERT INTO payment_events (client_id, recurring_fee_id, amount, currency, due_date, description, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (client_id, recurring_fee_id, fee["amount"], fee.get("currency", "CHF"),
+                 due_date_str, fee.get("description", ""), "not_sent")
+            )
+        elif fee["frequency"] == "yearly":
+            while next_date <= current_date:
+                due_date_str = next_date.strftime("%Y-%m-%d")
+                c.execute("SELECT COUNT(*) FROM payment_events WHERE recurring_fee_id=? AND due_date=?",
+                         (recurring_fee_id, due_date_str))
+                if c.fetchone()[0] == 0:
+                    c.execute(
+                        "INSERT INTO payment_events (client_id, recurring_fee_id, amount, currency, due_date, description, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (client_id, recurring_fee_id, fee["amount"], fee.get("currency", "CHF"),
+                         due_date_str, fee.get("description", ""), "not_sent")
+                    )
+                next_date = next_date + relativedelta(years=1)
+            # Add one more future occurrence
+            due_date_str = next_date.strftime("%Y-%m-%d")
+            c.execute(
+                "INSERT INTO payment_events (client_id, recurring_fee_id, amount, currency, due_date, description, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (client_id, recurring_fee_id, fee["amount"], fee.get("currency", "CHF"),
+                 due_date_str, fee.get("description", ""), "not_sent")
+            )
+        elif fee["frequency"] == "one-time":
+            due_date_str = start_date.strftime("%Y-%m-%d")
+            c.execute(
+                "INSERT INTO payment_events (client_id, recurring_fee_id, amount, currency, due_date, description, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (client_id, recurring_fee_id, fee["amount"], fee.get("currency", "CHF"),
+                 due_date_str, fee.get("description", ""), "not_sent")
+            )
+
+        conn.commit()
+        return {"id": recurring_fee_id}
 
 @app.put("/recurring-fees/{fee_id}")
 def update_recurring_fee(fee_id: int, fee: dict):
@@ -306,7 +377,7 @@ def create_payment_event(event: dict):
         c.execute(
             "INSERT INTO payment_events (client_id, recurring_fee_id, amount, currency, due_date, description, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (event["client_id"], event.get("recurring_fee_id"), event["amount"], event.get("currency", "CHF"),
-             event["due_date"], event.get("description", ""), event.get("status", "pending"))
+             event["due_date"], event.get("description", ""), event.get("status", "not_sent"))
         )
         conn.commit()
         return {"id": c.lastrowid}
@@ -335,11 +406,14 @@ def generate_payment_events(params: dict = Body(...)):
 
         generated_count = 0
         for fee in fees:
-            # Parse start date (DD.MM.YYYY or YYYY-MM-DD)
+            # Parse start date (DD.MM.YYYY, DD/MM/YYYY or YYYY-MM-DD)
             start_date_str = fee["start_date"]
             try:
                 if "." in start_date_str:
                     parts = start_date_str.split(".")
+                    start_date = datetime(int(parts[2]), int(parts[1]), int(parts[0]))
+                elif "/" in start_date_str:
+                    parts = start_date_str.split("/")
                     start_date = datetime(int(parts[2]), int(parts[1]), int(parts[0]))
                 else:
                     start_date = datetime.fromisoformat(start_date_str[:10])
@@ -597,8 +671,7 @@ async def create_invoice(
     client_id: int = Form(...),
     template_id: int = Form(...),
     data: str = Form(...),
-    logo_file: UploadFile = File(None),
-    payment_event_id: int = Form(None)
+    logo_file: UploadFile = File(None)
 ):
     RESULTS_DIR = "results"
     os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -616,11 +689,17 @@ async def create_invoice(
         conn.commit()
         invoice_id = c.lastrowid
 
-        # Link to payment event if provided
-        if payment_event_id:
-            from datetime import datetime
-            c.execute("UPDATE payment_events SET invoice_id=?, status=?, paid_date=? WHERE id=?",
-                     (invoice_id, "paid", datetime.now().strftime("%Y-%m-%d"), payment_event_id))
+        # Auto-link to the first available payment event (not_sent or sent) for this client
+        from datetime import datetime
+        c.execute(
+            "SELECT id FROM payment_events WHERE client_id=? AND status IN ('not_sent', 'sent') ORDER BY due_date ASC LIMIT 1",
+            (client_id,)
+        )
+        event_row = c.fetchone()
+        if event_row:
+            payment_event_id = event_row[0]
+            c.execute("UPDATE payment_events SET invoice_id=?, status=? WHERE id=?",
+                     (invoice_id, "sent", payment_event_id))
             conn.commit()
 
         c.execute("SELECT template_dir, html_filename, css_filename FROM templates WHERE id=?", (template_id,))

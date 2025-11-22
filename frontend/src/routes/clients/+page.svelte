@@ -9,7 +9,6 @@
     addRecurringFee,
     updateRecurringFee,
     deleteRecurringFee,
-    generatePaymentEvents,
   } from "$lib/api.js";
   let clients = [];
   let form = {
@@ -95,12 +94,6 @@
   async function removeFee(feeId) {
     await deleteRecurringFee(feeId);
     await loadFees(managingFeesFor);
-  }
-
-  async function generateEvents(clientId) {
-    const result = await generatePaymentEvents({ client_id: clientId });
-    alert(`Generated ${result.generated} payment event(s)`);
-    await loadFees(clientId);
   }
 </script>
 
@@ -312,13 +305,6 @@
                   </div>
                 </div>
               {/each}
-              <button
-                class="generate-btn"
-                type="button"
-                on:click={() => generateEvents(c.id)}
-              >
-                Generate Payment Events
-              </button>
             </div>
           {:else}
             <p class="no-fees">No recurring fees yet.</p>
@@ -565,16 +551,6 @@
     color: var(--text-secondary-color);
     font-style: italic;
     margin-top: 1rem;
-  }
-
-  .generate-btn {
-    margin-top: 1rem;
-    background-color: var(--success-color);
-    color: white;
-  }
-
-  .generate-btn:hover {
-    background-color: #45a049;
   }
 
   @media (max-width: 600px) {
