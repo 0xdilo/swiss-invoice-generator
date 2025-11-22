@@ -53,6 +53,31 @@ def init_db():
             creditor_name TEXT, creditor_street TEXT, creditor_postalcode TEXT,
             creditor_city TEXT, creditor_country TEXT
         )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS recurring_fees (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            amount REAL,
+            currency TEXT DEFAULT 'CHF',
+            frequency TEXT,
+            start_date TEXT,
+            description TEXT,
+            FOREIGN KEY (client_id) REFERENCES clients(id)
+        )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS payment_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER,
+            recurring_fee_id INTEGER,
+            amount REAL,
+            currency TEXT DEFAULT 'CHF',
+            due_date TEXT,
+            description TEXT,
+            status TEXT DEFAULT 'pending',
+            invoice_id INTEGER,
+            paid_date TEXT,
+            FOREIGN KEY (client_id) REFERENCES clients(id),
+            FOREIGN KEY (recurring_fee_id) REFERENCES recurring_fees(id),
+            FOREIGN KEY (invoice_id) REFERENCES invoices(id)
+        )''')
         c.execute("SELECT COUNT(*) FROM bank_details")
         if c.fetchone()[0] == 0:
             c.execute('''INSERT INTO bank_details
@@ -184,6 +209,44 @@ def delete_client(client_id: int):
         conn.commit()
         return {"ok": True}
 
+@app.get("/clients/{client_id}/recurring-fees")
+def get_recurring_fees(client_id: int):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM recurring_fees WHERE client_id=?", (client_id,))
+        rows = c.fetchall()
+        return [dict(zip([col[0] for col in c.description], row)) for row in rows]
+
+@app.post("/clients/{client_id}/recurring-fees")
+def add_recurring_fee(client_id: int, fee: dict):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO recurring_fees (client_id, amount, currency, frequency, start_date, description) VALUES (?, ?, ?, ?, ?, ?)",
+            (client_id, fee["amount"], fee.get("currency", "CHF"), fee["frequency"], fee["start_date"], fee.get("description", ""))
+        )
+        conn.commit()
+        return {"id": c.lastrowid}
+
+@app.put("/recurring-fees/{fee_id}")
+def update_recurring_fee(fee_id: int, fee: dict):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute(
+            "UPDATE recurring_fees SET amount=?, currency=?, frequency=?, start_date=?, description=? WHERE id=?",
+            (fee["amount"], fee.get("currency", "CHF"), fee["frequency"], fee["start_date"], fee.get("description", ""), fee_id)
+        )
+        conn.commit()
+        return {"ok": True}
+
+@app.delete("/recurring-fees/{fee_id}")
+def delete_recurring_fee(fee_id: int):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM recurring_fees WHERE id=?", (fee_id,))
+        conn.commit()
+        return {"ok": True}
+
 @app.get("/bank-details")
 def get_bank_details():
     with db() as conn:
@@ -200,6 +263,182 @@ def update_bank_details(details: dict = Body(...)):
             (details["iban"], details["bank_name"], details["bank_address"], details["bic"],
              details["creditor_name"], details["creditor_street"], details["creditor_postalcode"],
              details["creditor_city"], details["creditor_country"]))
+        conn.commit()
+        return {"ok": True}
+
+@app.get("/payment-events")
+def get_payment_events(client_id: int = None, status: str = None):
+    with db() as conn:
+        c = conn.cursor()
+        query = "SELECT * FROM payment_events"
+        params = []
+        conditions = []
+
+        if client_id is not None:
+            conditions.append("client_id=?")
+            params.append(client_id)
+
+        if status is not None:
+            conditions.append("status=?")
+            params.append(status)
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY due_date ASC"
+
+        c.execute(query, params)
+        rows = c.fetchall()
+        events = [dict(zip([col[0] for col in c.description], row)) for row in rows]
+
+        # Add client name to each event
+        for event in events:
+            c.execute("SELECT name FROM clients WHERE id=?", (event["client_id"],))
+            client = c.fetchone()
+            event["client_name"] = client[0] if client else "Unknown"
+
+        return events
+
+@app.post("/payment-events")
+def create_payment_event(event: dict):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO payment_events (client_id, recurring_fee_id, amount, currency, due_date, description, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (event["client_id"], event.get("recurring_fee_id"), event["amount"], event.get("currency", "CHF"),
+             event["due_date"], event.get("description", ""), event.get("status", "pending"))
+        )
+        conn.commit()
+        return {"id": c.lastrowid}
+
+@app.post("/payment-events/generate")
+def generate_payment_events(params: dict = Body(...)):
+    """Generate payment events from recurring fees"""
+    from datetime import datetime, timedelta
+    from dateutil.relativedelta import relativedelta
+
+    client_id = params.get("client_id")
+    recurring_fee_id = params.get("recurring_fee_id")
+
+    with db() as conn:
+        c = conn.cursor()
+
+        # Get recurring fees to process
+        if recurring_fee_id:
+            c.execute("SELECT * FROM recurring_fees WHERE id=?", (recurring_fee_id,))
+        elif client_id:
+            c.execute("SELECT * FROM recurring_fees WHERE client_id=?", (client_id,))
+        else:
+            c.execute("SELECT * FROM recurring_fees")
+
+        fees = [dict(zip([col[0] for col in c.description], row)) for row in c.fetchall()]
+
+        generated_count = 0
+        for fee in fees:
+            # Parse start date (DD.MM.YYYY or YYYY-MM-DD)
+            start_date_str = fee["start_date"]
+            try:
+                if "." in start_date_str:
+                    parts = start_date_str.split(".")
+                    start_date = datetime(int(parts[2]), int(parts[1]), int(parts[0]))
+                else:
+                    start_date = datetime.fromisoformat(start_date_str[:10])
+            except:
+                continue
+
+            # Calculate next occurrences
+            current_date = datetime.now()
+            next_date = start_date
+
+            # Find the next occurrence after today
+            if fee["frequency"] == "monthly":
+                while next_date < current_date:
+                    next_date = next_date + relativedelta(months=1)
+            elif fee["frequency"] == "yearly":
+                while next_date < current_date:
+                    next_date = next_date + relativedelta(years=1)
+            elif fee["frequency"] == "one-time":
+                next_date = start_date
+
+            # Check if event already exists for this date
+            due_date_str = next_date.strftime("%Y-%m-%d")
+            c.execute("SELECT COUNT(*) FROM payment_events WHERE recurring_fee_id=? AND due_date=?",
+                     (fee["id"], due_date_str))
+
+            if c.fetchone()[0] == 0:
+                # Create the event
+                c.execute(
+                    "INSERT INTO payment_events (client_id, recurring_fee_id, amount, currency, due_date, description, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (fee["client_id"], fee["id"], fee["amount"], fee["currency"],
+                     due_date_str, fee["description"], "pending")
+                )
+                generated_count += 1
+
+        conn.commit()
+        return {"generated": generated_count}
+
+@app.put("/payment-events/{event_id}")
+def update_payment_event(event_id: int, event: dict):
+    from datetime import datetime
+
+    with db() as conn:
+        c = conn.cursor()
+
+        # Build update query based on provided fields
+        updates = []
+        params = []
+
+        if "amount" in event:
+            updates.append("amount=?")
+            params.append(event["amount"])
+
+        if "currency" in event:
+            updates.append("currency=?")
+            params.append(event["currency"])
+
+        if "due_date" in event:
+            updates.append("due_date=?")
+            params.append(event["due_date"])
+
+        if "description" in event:
+            updates.append("description=?")
+            params.append(event["description"])
+
+        if "status" in event:
+            updates.append("status=?")
+            params.append(event["status"])
+
+            # If marking as paid, record the date
+            if event["status"] == "paid" and "paid_date" not in event:
+                updates.append("paid_date=?")
+                params.append(datetime.now().strftime("%Y-%m-%d"))
+            elif event["status"] != "paid":
+                updates.append("paid_date=?")
+                params.append(None)
+
+        if "paid_date" in event:
+            updates.append("paid_date=?")
+            params.append(event["paid_date"])
+
+        if "invoice_id" in event:
+            updates.append("invoice_id=?")
+            params.append(event["invoice_id"])
+
+        if not updates:
+            return {"ok": True}
+
+        params.append(event_id)
+        query = f"UPDATE payment_events SET {', '.join(updates)} WHERE id=?"
+
+        c.execute(query, params)
+        conn.commit()
+        return {"ok": True}
+
+@app.delete("/payment-events/{event_id}")
+def delete_payment_event(event_id: int):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM payment_events WHERE id=?", (event_id,))
         conn.commit()
         return {"ok": True}
 
@@ -358,7 +597,8 @@ async def create_invoice(
     client_id: int = Form(...),
     template_id: int = Form(...),
     data: str = Form(...),
-    logo_file: UploadFile = File(None)
+    logo_file: UploadFile = File(None),
+    payment_event_id: int = Form(None)
 ):
     RESULTS_DIR = "results"
     os.makedirs(RESULTS_DIR, exist_ok=True)
@@ -375,6 +615,13 @@ async def create_invoice(
                   (invoice_number, client_id, template_id, data))
         conn.commit()
         invoice_id = c.lastrowid
+
+        # Link to payment event if provided
+        if payment_event_id:
+            from datetime import datetime
+            c.execute("UPDATE payment_events SET invoice_id=?, status=?, paid_date=? WHERE id=?",
+                     (invoice_id, "paid", datetime.now().strftime("%Y-%m-%d"), payment_event_id))
+            conn.commit()
 
         c.execute("SELECT template_dir, html_filename, css_filename FROM templates WHERE id=?", (template_id,))
         tpl = c.fetchone()

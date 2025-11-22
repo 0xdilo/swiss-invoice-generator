@@ -7,6 +7,7 @@
       <a href="/clients">Clients</a>
       <a href="/templates">Templates</a>
       <a href="/invoices">Invoices</a>
+      <a href="/payments">Payments</a>
       <a href="/bank">Bank Details</a>
     </div>
   </nav>
