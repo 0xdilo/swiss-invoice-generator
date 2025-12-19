@@ -36,191 +36,243 @@
   function formatCurrency(amount) {
     return new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF' }).format(amount || 0);
   }
+
+  function formatCompact(amount) {
+    if (amount >= 1000) {
+      return (amount / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    }
+    return amount?.toString() || '0';
+  }
 </script>
 
-<div class="page-header">
-  <div>
-    <h1>Dashboard</h1>
-    <p class="subtitle">Overview of your business performance</p>
-  </div>
-  <div class="period-tabs">
-    <button class:active={period === "month"} onclick={() => changePeriod("month")}>Month</button>
-    <button class:active={period === "year"} onclick={() => changePeriod("year")}>Year</button>
-    <button class:active={period === "all"} onclick={() => changePeriod("all")}>All Time</button>
-  </div>
-</div>
-
-{#if stats}
-  <div class="stats-row">
-    <div class="stat-card primary">
-      <div class="stat-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="12" y1="1" x2="12" y2="23"/>
-          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-        </svg>
+<div class="page">
+  <header class="page-header">
+    <div class="header-content">
+      <div class="greeting">
+        <h1>Dashboard</h1>
+        <p class="subtitle">Business overview</p>
       </div>
-      <div class="stat-content">
-        <span class="stat-value">{formatCurrency(stats.total_revenue)}</span>
-        <span class="stat-label">Total Revenue</span>
+      <div class="period-selector">
+        {#each [["month", "Month"], ["year", "Year"], ["all", "All Time"]] as [value, label]}
+          <button class:active={period === value} onclick={() => changePeriod(value)}>{label}</button>
+        {/each}
       </div>
     </div>
+  </header>
 
-    <div class="stat-card">
-      <div class="stat-icon warning">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <polyline points="12 6 12 12 16 14"/>
-        </svg>
+  {#if stats}
+    <div class="metrics-grid">
+      <div class="metric-card featured">
+        <div class="metric-header">
+          <span class="metric-label">Total Revenue</span>
+          <div class="metric-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="1" x2="12" y2="23"/>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+          </div>
+        </div>
+        <span class="metric-value">{formatCurrency(stats.total_revenue)}</span>
+        <div class="metric-badges">
+          <span class="badge neutral">{stats.invoice_counts.draft} draft</span>
+          <span class="badge warning">{stats.invoice_counts.sent} sent</span>
+          <span class="badge success">{stats.invoice_counts.paid} paid</span>
+        </div>
       </div>
-      <div class="stat-content">
-        <span class="stat-value">{formatCurrency(stats.outstanding)}</span>
-        <span class="stat-label">Outstanding</span>
-      </div>
-    </div>
 
-    <div class="stat-card">
-      <div class="stat-icon danger">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
-        </svg>
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Outstanding</span>
+          <div class="metric-icon warning">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+        </div>
+        <span class="metric-value warning">{formatCurrency(stats.outstanding)}</span>
       </div>
-      <div class="stat-content">
-        <span class="stat-value">{formatCurrency(stats.total_expenses)}</span>
-        <span class="stat-label">Expenses</span>
-      </div>
-    </div>
 
-    <div class="stat-card">
-      <div class="stat-icon" class:success={stats.net_profit > 0} class:danger={stats.net_profit < 0}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-          <polyline points="17 6 23 6 23 12"/>
-        </svg>
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Expenses</span>
+          <div class="metric-icon danger">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
+              <polyline points="17 18 23 18 23 12"/>
+            </svg>
+          </div>
+        </div>
+        <span class="metric-value">{formatCurrency(stats.total_expenses)}</span>
       </div>
-      <div class="stat-content">
-        <span class="stat-value" class:positive={stats.net_profit > 0} class:negative={stats.net_profit < 0}>
+
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Net Profit</span>
+          <div class="metric-icon" class:success={stats.net_profit > 0} class:danger={stats.net_profit < 0}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+              <polyline points="17 6 23 6 23 12"/>
+            </svg>
+          </div>
+        </div>
+        <span class="metric-value" class:success={stats.net_profit > 0} class:danger={stats.net_profit < 0}>
           {formatCurrency(stats.net_profit)}
         </span>
-        <span class="stat-label">Net Profit</span>
       </div>
     </div>
-  </div>
+  {/if}
 
-  <div class="invoice-summary">
-    <span class="badge draft">{stats.invoice_counts.draft} Draft</span>
-    <span class="badge sent">{stats.invoice_counts.sent} Sent</span>
-    <span class="badge paid">{stats.invoice_counts.paid} Paid</span>
-  </div>
-{/if}
-
-<div class="grid-2">
-  <div class="card">
-    <div class="card-header">
-      <h3>Partner Earnings</h3>
-    </div>
-    <div class="card-body">
-      {#if partnerData.partners.length > 0}
-        <div class="partner-list">
-          {#each partnerData.partners as partner}
-            <div class="partner-row">
-              <div class="partner-info">
-                <span class="partner-dot" style="background-color: {partner.color}"></span>
-                <span class="partner-name">{partner.name}</span>
+  <div class="panels-grid">
+    <section class="panel">
+      <header class="panel-header">
+        <h2>Partner Earnings</h2>
+      </header>
+      <div class="panel-body">
+        {#if partnerData.partners.length > 0}
+          <div class="partner-list">
+            {#each partnerData.partners as partner}
+              <div class="partner-row">
+                <div class="partner-info">
+                  <span class="partner-dot" style="background-color: {partner.color}"></span>
+                  <span class="partner-name">{partner.name}</span>
+                </div>
+                <span class="partner-amount">{formatCurrency(partner.earnings)}</span>
               </div>
-              <span class="partner-earnings">{formatCurrency(partner.earnings)}</span>
+            {/each}
+          </div>
+
+          {#if expenseBalance && expenseBalance.balance > 0}
+            <div class="balance-alert">
+              <div class="alert-content">
+                <span class="alert-text"><strong>{expenseBalance.owes_from}</strong> owes <strong>{expenseBalance.owes_to}</strong></span>
+                <span class="alert-amount">{formatCurrency(expenseBalance.balance)}</span>
+              </div>
+              <a href="/expenses" class="alert-action">Settle</a>
             </div>
-          {/each}
-        </div>
-      {:else}
-        <p class="empty-state">No earnings data yet</p>
-      {/if}
-
-      {#if expenseBalance && expenseBalance.balance > 0}
-        <div class="balance-card">
-          <span class="balance-text">
-            <strong>{expenseBalance.owes_from}</strong> owes <strong>{expenseBalance.owes_to}</strong>
-          </span>
-          <span class="balance-amount">{formatCurrency(expenseBalance.balance)}</span>
-        </div>
-      {/if}
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-header">
-      <h3>Upcoming Renewals</h3>
-      <div class="header-tabs">
-        <button class:active={renewalDays === 7} onclick={() => changeRenewalDays(7)}>7d</button>
-        <button class:active={renewalDays === 14} onclick={() => changeRenewalDays(14)}>14d</button>
-        <button class:active={renewalDays === 30} onclick={() => changeRenewalDays(30)}>30d</button>
+          {/if}
+        {:else}
+          <div class="empty-panel">
+            <p>No earnings data yet</p>
+          </div>
+        {/if}
       </div>
-    </div>
-    <div class="card-body">
-      {#if renewals.length > 0}
-        <div class="renewal-list">
-          {#each renewals as renewal}
-            <div class="renewal-row" class:critical={renewal.urgency === "critical"} class:warning={renewal.urgency === "warning"}>
-              <div class="renewal-info">
-                <span class="renewal-client">{renewal.client_name}</span>
-                <span class="renewal-desc">{renewal.description || "Renewal"}</span>
-              </div>
-              <div class="renewal-meta">
-                <span class="renewal-days">{renewal.days_until}d</span>
-                <span class="renewal-amount">{formatCurrency(renewal.amount)}</span>
-              </div>
-            </div>
+    </section>
+
+    <section class="panel">
+      <header class="panel-header">
+        <h2>Upcoming Renewals</h2>
+        <div class="header-tabs">
+          {#each [[7, "7d"], [14, "14d"], [30, "30d"]] as [days, label]}
+            <button class:active={renewalDays === days} onclick={() => changeRenewalDays(days)}>{label}</button>
           {/each}
         </div>
-      {:else}
-        <p class="empty-state">No renewals in the next {renewalDays} days</p>
-      {/if}
-    </div>
+      </header>
+      <div class="panel-body">
+        {#if renewals.length > 0}
+          <div class="renewal-list">
+            {#each renewals as renewal}
+              <div class="renewal-row" class:critical={renewal.urgency === "critical"} class:warning={renewal.urgency === "warning"}>
+                <div class="renewal-info">
+                  <span class="renewal-client">{renewal.client_name}</span>
+                  <span class="renewal-desc">{renewal.description || "Renewal"}</span>
+                </div>
+                <div class="renewal-meta">
+                  <span class="renewal-days" class:critical={renewal.urgency === "critical"} class:warning={renewal.urgency === "warning"}>
+                    {renewal.days_until}d
+                  </span>
+                  <span class="renewal-amount">{formatCurrency(renewal.amount)}</span>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <div class="empty-panel">
+            <p>No renewals in the next {renewalDays} days</p>
+          </div>
+        {/if}
+      </div>
+    </section>
   </div>
-</div>
 
-<div class="card">
-  <div class="card-header">
-    <h3>Outstanding Invoices</h3>
-  </div>
-  <div class="card-body">
+  <section class="panel full-width">
+    <header class="panel-header">
+      <h2>Outstanding Invoices</h2>
+      {#if outstanding.length > 0}
+        <span class="count-badge">{outstanding.length}</span>
+      {/if}
+    </header>
     {#if outstanding.length > 0}
-      <table>
-        <thead>
-          <tr>
-            <th>Invoice</th>
-            <th>Client</th>
-            <th>Status</th>
-            <th style="text-align: right">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each outstanding as invoice}
+      <div class="table-wrapper">
+        <table>
+          <thead>
             <tr>
-              <td><span class="invoice-id">#{invoice.invoice_number}</span></td>
-              <td>{invoice.client_name || "—"}</td>
-              <td><span class="badge {invoice.status}">{invoice.status}</span></td>
-              <td style="text-align: right; font-weight: 600">{formatCurrency(invoice.total_amount)}</td>
+              <th>Invoice</th>
+              <th>Client</th>
+              <th>Status</th>
+              <th class="text-right">Amount</th>
             </tr>
-          {/each}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {#each outstanding as invoice, i}
+              <tr style="--delay: {i * 0.03}s">
+                <td>
+                  <span class="invoice-number">#{invoice.invoice_number}</span>
+                </td>
+                <td>
+                  <span class="client-name">{invoice.client_name || "—"}</span>
+                </td>
+                <td>
+                  <span class="status-tag {invoice.status}">{invoice.status}</span>
+                </td>
+                <td class="text-right">
+                  <span class="amount">{formatCurrency(invoice.total_amount)}</span>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
     {:else}
-      <p class="empty-state">No outstanding invoices</p>
+      <div class="panel-body">
+        <div class="empty-panel">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          <p>No outstanding invoices</p>
+        </div>
+      </div>
     {/if}
-  </div>
+  </section>
 </div>
 
 <style>
+  .page {
+    animation: fadeIn 0.4s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   .page-header {
+    margin-bottom: 2rem;
+  }
+
+  .header-content {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 2rem;
     gap: 1rem;
     flex-wrap: wrap;
   }
 
-  h1 {
+  .greeting h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
     margin-bottom: 0.25rem;
   }
 
@@ -230,159 +282,178 @@
     font-size: 0.9375rem;
   }
 
-  .period-tabs {
+  .period-selector {
     display: flex;
     background: var(--color-surface);
-    border-radius: var(--radius-md);
     padding: 0.25rem;
-    box-shadow: var(--shadow-sm);
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
 
-  .period-tabs button {
+  .period-selector button {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
     background: transparent;
     color: var(--color-text-secondary);
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-sm);
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.15s ease;
   }
 
-  .period-tabs button:hover {
+  .period-selector button:hover {
     color: var(--color-text);
   }
 
-  .period-tabs button.active {
-    background: var(--color-primary);
-    color: white;
+  .period-selector button.active {
+    background: var(--color-text);
+    color: var(--color-surface);
   }
 
-  .stats-row {
+  .metrics-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 1rem;
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
   }
 
-  .stat-card {
+  .metric-card {
     background: var(--color-surface);
-    border-radius: var(--radius-lg);
+    border-radius: 16px;
     padding: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     display: flex;
-    align-items: center;
-    gap: 1rem;
-    box-shadow: var(--shadow-sm);
+    flex-direction: column;
+    gap: 0.75rem;
   }
 
-  .stat-card.primary {
-    background: linear-gradient(135deg, var(--color-primary) 0%, #2563eb 100%);
+  .metric-card.featured {
+    grid-column: span 1;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
     color: white;
   }
 
-  .stat-card.primary .stat-label {
-    color: rgba(255, 255, 255, 0.8);
+  .metric-card.featured .metric-label {
+    color: rgba(255,255,255,0.7);
   }
 
-  .stat-card.primary .stat-icon {
-    background: rgba(255, 255, 255, 0.2);
+  .metric-card.featured .metric-icon {
+    background: rgba(255,255,255,0.15);
     color: white;
   }
 
-  .stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-md);
-    background: var(--color-primary-light);
-    color: var(--color-primary);
+  .metric-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .metric-label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  .metric-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--color-bg);
+    color: var(--color-text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
   }
 
-  .stat-icon.warning {
-    background: var(--color-warning-light);
-    color: var(--color-warning);
+  .metric-icon.warning {
+    background: #fef3c7;
+    color: #d97706;
   }
 
-  .stat-icon.danger {
-    background: var(--color-danger-light);
-    color: var(--color-danger);
+  .metric-icon.danger {
+    background: #fee2e2;
+    color: #dc2626;
   }
 
-  .stat-icon.success {
-    background: var(--color-success-light);
-    color: var(--color-success);
+  .metric-icon.success {
+    background: #dcfce7;
+    color: #16a34a;
   }
 
-  .stat-content {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .stat-value {
-    font-size: 1.5rem;
+  .metric-value {
+    font-size: 1.625rem;
     font-weight: 700;
-    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
   }
 
-  .stat-value.positive {
-    color: var(--color-success);
+  .metric-card.featured .metric-value {
+    color: white;
   }
 
-  .stat-value.negative {
-    color: var(--color-danger);
+  .metric-value.warning {
+    color: #d97706;
   }
 
-  .stat-label {
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
-    margin-top: 0.125rem;
+  .metric-value.success {
+    color: #16a34a;
   }
 
-  .invoice-summary {
+  .metric-value.danger {
+    color: #dc2626;
+  }
+
+  .metric-badges {
     display: flex;
-    gap: 0.5rem;
-    margin-bottom: 2rem;
+    gap: 0.375rem;
     flex-wrap: wrap;
   }
 
   .badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.375rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.8125rem;
+    font-size: 0.6875rem;
     font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
   }
 
-  .badge.draft {
-    background: var(--color-border-light);
+  .metric-card.featured .badge {
+    background: rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.9);
+  }
+
+  .badge.neutral {
+    background: var(--color-bg);
     color: var(--color-text-secondary);
   }
 
-  .badge.sent {
-    background: var(--color-warning-light);
+  .badge.warning {
+    background: #fef3c7;
     color: #92400e;
   }
 
-  .badge.paid {
-    background: var(--color-success-light);
-    color: #065f46;
+  .badge.success {
+    background: #dcfce7;
+    color: #166534;
   }
 
-  .grid-2 {
+  .panels-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr 1fr;
     gap: 1.5rem;
     margin-bottom: 1.5rem;
   }
 
-  .card {
+  .panel {
     background: var(--color-surface);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     overflow: hidden;
   }
 
-  .card-header {
+  .panel.full-width {
+    grid-column: span 2;
+  }
+
+  .panel-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -390,58 +461,72 @@
     border-bottom: 1px solid var(--color-border-light);
   }
 
-  .card-header h3 {
-    margin: 0;
-    font-size: 1rem;
+  .panel-header h2 {
+    font-size: 0.9375rem;
     font-weight: 600;
+    margin: 0;
+  }
+
+  .count-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--color-text);
+    color: var(--color-surface);
+    padding: 0.25rem 0.625rem;
+    border-radius: 10px;
   }
 
   .header-tabs {
     display: flex;
     gap: 0.25rem;
+    background: var(--color-bg);
+    padding: 0.125rem;
+    border-radius: 6px;
   }
 
   .header-tabs button {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
     background: transparent;
     color: var(--color-text-muted);
-    padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
-    border-radius: var(--radius-sm);
+    font-weight: 500;
+    transition: all 0.15s ease;
   }
 
   .header-tabs button:hover {
     color: var(--color-text);
-    background: var(--color-bg);
   }
 
   .header-tabs button.active {
-    background: var(--color-primary);
-    color: white;
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
   }
 
-  .card-body {
-    padding: 1.25rem;
+  .panel-body {
+    padding: 1rem 1.25rem;
   }
 
   .partner-list {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
   .partner-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem;
+    padding: 0.75rem 1rem;
     background: var(--color-bg);
-    border-radius: var(--radius-md);
+    border-radius: 10px;
   }
 
   .partner-info {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: 0.75rem;
   }
 
   .partner-dot {
@@ -454,28 +539,52 @@
     font-weight: 500;
   }
 
-  .partner-earnings {
+  .partner-amount {
     font-weight: 600;
-    color: var(--color-success);
+    color: #16a34a;
   }
 
-  .balance-card {
+  .balance-alert {
     margin-top: 1rem;
-    padding: 0.875rem;
-    background: var(--color-warning-light);
-    border-radius: var(--radius-md);
+    padding: 0.875rem 1rem;
+    background: #fef3c7;
+    border-radius: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
   }
 
-  .balance-text {
-    font-size: 0.875rem;
+  .alert-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
   }
 
-  .balance-amount {
+  .alert-text {
+    font-size: 0.875rem;
+    color: #92400e;
+  }
+
+  .alert-amount {
     font-weight: 600;
     color: #b45309;
+  }
+
+  .alert-action {
+    padding: 0.375rem 0.75rem;
+    background: #92400e;
+    color: white;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background 0.15s ease;
+  }
+
+  .alert-action:hover {
+    background: #78350f;
+    text-decoration: none;
+    color: white;
   }
 
   .renewal-list {
@@ -488,20 +597,21 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem;
+    padding: 0.75rem 1rem;
     background: var(--color-bg);
-    border-radius: var(--radius-md);
-    border-left: 3px solid var(--color-primary);
+    border-radius: 10px;
+    border-left: 3px solid var(--color-border);
+    transition: all 0.15s ease;
   }
 
   .renewal-row.critical {
-    border-left-color: var(--color-danger);
-    background: var(--color-danger-light);
+    border-left-color: #dc2626;
+    background: #fef2f2;
   }
 
   .renewal-row.warning {
-    border-left-color: var(--color-warning);
-    background: var(--color-warning-light);
+    border-left-color: #d97706;
+    background: #fffbeb;
   }
 
   .renewal-info {
@@ -512,6 +622,7 @@
 
   .renewal-client {
     font-weight: 500;
+    font-size: 0.9375rem;
   }
 
   .renewal-desc {
@@ -529,46 +640,171 @@
     font-size: 0.75rem;
     font-weight: 600;
     padding: 0.25rem 0.5rem;
-    background: rgba(0, 0, 0, 0.06);
-    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    border-radius: 5px;
+    color: var(--color-text-secondary);
+  }
+
+  .renewal-days.critical {
+    background: #fee2e2;
+    color: #dc2626;
+  }
+
+  .renewal-days.warning {
+    background: #fef3c7;
+    color: #92400e;
   }
 
   .renewal-amount {
     font-weight: 600;
+    font-size: 0.9375rem;
   }
 
-  .invoice-id {
+  .table-wrapper {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th {
+    padding: 0.75rem 1.25rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border-light);
+  }
+
+  th.text-right {
+    text-align: right;
+  }
+
+  td {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--color-border-light);
+    vertical-align: middle;
+  }
+
+  td.text-right {
+    text-align: right;
+  }
+
+  tr {
+    animation: rowFade 0.3s ease backwards;
+    animation-delay: var(--delay);
+  }
+
+  @keyframes rowFade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  tbody tr:hover {
+    background: var(--color-bg);
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .invoice-number {
     font-family: ui-monospace, monospace;
+    font-weight: 600;
     font-size: 0.875rem;
     color: var(--color-primary);
-    font-weight: 600;
   }
 
-  .empty-state {
-    text-align: center;
+  .client-name {
+    font-weight: 500;
+  }
+
+  .status-tag {
+    display: inline-block;
+    padding: 0.25rem 0.625rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: capitalize;
+  }
+
+  .status-tag.draft {
+    background: var(--color-bg);
+    color: var(--color-text-secondary);
+  }
+
+  .status-tag.sent {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .status-tag.paid {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .amount {
+    font-weight: 600;
+    font-size: 0.9375rem;
+  }
+
+  .empty-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1rem;
     color: var(--color-text-muted);
-    padding: 2rem 1rem;
+    text-align: center;
+  }
+
+  .empty-panel svg {
+    opacity: 0.3;
+    margin-bottom: 0.75rem;
+  }
+
+  .empty-panel p {
     margin: 0;
+    font-size: 0.9375rem;
+  }
+
+  @media (max-width: 1200px) {
+    .metrics-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 
   @media (max-width: 900px) {
-    .grid-2 {
+    .panels-grid {
       grid-template-columns: 1fr;
+    }
+
+    .panel.full-width {
+      grid-column: span 1;
     }
   }
 
   @media (max-width: 640px) {
-    .page-header {
+    .header-content {
       flex-direction: column;
       align-items: stretch;
     }
 
-    .period-tabs {
+    .period-selector {
       justify-content: center;
     }
 
-    .stats-row {
+    .metrics-grid {
       grid-template-columns: 1fr 1fr;
+    }
+
+    .greeting h1 {
+      font-size: 1.5rem;
     }
   }
 </style>

@@ -267,3 +267,55 @@ export async function checkTelegramNotifications() {
 export async function generateInvoiceFromRecurring(feeId) {
   return fetch(`${API}/recurring-fees/${feeId}/generate-invoice`, { method: "POST" }).then(r => r.json());
 }
+
+export async function getTodos(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.status) params.append("status", filters.status);
+  if (filters.priority) params.append("priority", filters.priority);
+  if (filters.client_id) params.append("client_id", filters.client_id);
+  const url = params.toString() ? `${API}/todos?${params}` : `${API}/todos`;
+  return fetch(url).then(r => r.json());
+}
+export async function createTodo(todo) {
+  return fetch(`${API}/todos`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(todo)
+  }).then(r => r.json());
+}
+export async function updateTodo(id, todo) {
+  return fetch(`${API}/todos/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(todo)
+  }).then(r => r.json());
+}
+export async function deleteTodo(id) {
+  return fetch(`${API}/todos/${id}`, { method: "DELETE" }).then(r => r.json());
+}
+
+export async function getCalendarEvents(filters = {}) {
+  const params = new URLSearchParams();
+  if (filters.start) params.append("start", filters.start);
+  if (filters.end) params.append("end", filters.end);
+  if (filters.client_id) params.append("client_id", filters.client_id);
+  const url = params.toString() ? `${API}/calendar/events?${params}` : `${API}/calendar/events`;
+  return fetch(url).then(r => r.json());
+}
+export async function createCalendarEvent(event) {
+  return fetch(`${API}/calendar/events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(event)
+  }).then(r => r.json());
+}
+export async function updateCalendarEvent(id, event) {
+  return fetch(`${API}/calendar/events/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(event)
+  }).then(r => r.json());
+}
+export async function deleteCalendarEvent(id) {
+  return fetch(`${API}/calendar/events/${id}`, { method: "DELETE" }).then(r => r.json());
+}

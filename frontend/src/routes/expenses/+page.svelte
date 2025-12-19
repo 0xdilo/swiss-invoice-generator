@@ -31,14 +31,21 @@
   let showSettleModal = false;
 
   const categories = [
-    { value: "hosting", label: "Hosting" },
-    { value: "domain", label: "Domains" },
-    { value: "tools", label: "Tools & Software" },
-    { value: "equipment", label: "Equipment" },
-    { value: "office", label: "Office" },
-    { value: "travel", label: "Travel" },
-    { value: "other", label: "Other" }
+    { value: "hosting", label: "Hosting", icon: "server" },
+    { value: "domain", label: "Domains", icon: "globe" },
+    { value: "tools", label: "Tools & Software", icon: "tool" },
+    { value: "equipment", label: "Equipment", icon: "monitor" },
+    { value: "office", label: "Office", icon: "briefcase" },
+    { value: "travel", label: "Travel", icon: "plane" },
+    { value: "other", label: "Other", icon: "folder" }
   ];
+
+  $: stats = {
+    total: expenses.length,
+    pending: expenses.filter(e => e.status !== 'settled').length,
+    settled: expenses.filter(e => e.status === 'settled').length,
+    totalAmount: expenses.reduce((sum, e) => sum + (e.amount || 0), 0),
+  };
 
   async function load() {
     [expenses, partners, balance, settlements] = await Promise.all([
@@ -135,72 +142,206 @@
 
   function formatDate(dateStr) {
     if (!dateStr) return "";
-    return new Date(dateStr).toLocaleDateString('de-CH');
+    return new Date(dateStr).toLocaleDateString('de-CH', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
   function updateSplitA(value) {
     form.split_ratio_a = parseFloat(value);
     form.split_ratio_b = 100 - parseFloat(value);
   }
+
+  function getCategoryColor(cat) {
+    const colors = {
+      hosting: '#6366f1',
+      domain: '#8b5cf6',
+      tools: '#ec4899',
+      equipment: '#f59e0b',
+      office: '#10b981',
+      travel: '#3b82f6',
+      other: '#6b7280'
+    };
+    return colors[cat] || colors.other;
+  }
 </script>
 
-<div class="page-header">
-  <div>
-    <h1>Expenses</h1>
-    <p class="subtitle">Track business expenses and reimbursements</p>
-  </div>
-  <button class="btn-primary" onclick={openAddForm}>
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <line x1="12" y1="5" x2="12" y2="19"/>
-      <line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-    Add Expense
-  </button>
-</div>
-
-{#if balance && balance.balance > 0}
-  <div class="balance-banner">
-    <div class="balance-info">
+<div class="expenses-page">
+  <header class="page-header">
+    <div class="header-content">
+      <h1>Expenses</h1>
+      <p class="subtitle">Track and split business expenses</p>
+    </div>
+    <button class="btn-add" onclick={openAddForm}>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="8" x2="12" y2="12"/>
-        <line x1="12" y1="16" x2="12.01" y2="16"/>
+        <line x1="12" y1="5" x2="12" y2="19"/>
+        <line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
-      <span><strong>{balance.owes_from}</strong> owes <strong>{balance.owes_to}</strong></span>
-    </div>
-    <div class="balance-actions">
-      <span class="balance-amount">{formatCurrency(balance.balance)}</span>
-      <button class="btn-settle" onclick={() => showSettleModal = true}>Settle</button>
-    </div>
-  </div>
-{/if}
+      Add Expense
+    </button>
+  </header>
 
-<div class="card filter-bar">
-  <div class="filter-row">
-    <select bind:value={filters.category} onchange={applyFilters}>
-      <option value="">All Categories</option>
-      {#each categories as cat}
-        <option value={cat.value}>{cat.label}</option>
-      {/each}
-    </select>
-    <select bind:value={filters.expense_type} onchange={applyFilters}>
-      <option value="">All Types</option>
-      <option value="business">Business</option>
-      <option value="reimbursable">Reimbursable</option>
-    </select>
-    <select bind:value={filters.status} onchange={applyFilters}>
-      <option value="">All Status</option>
-      <option value="pending">Pending</option>
-      <option value="settled">Settled</option>
-    </select>
+  <div class="stats-row">
+    <div class="stat-card">
+      <span class="stat-value">{formatCurrency(stats.totalAmount)}</span>
+      <span class="stat-label">Total Expenses</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value">{stats.total}</span>
+      <span class="stat-label">Transactions</span>
+    </div>
+    <div class="stat-card pending">
+      <span class="stat-value">{stats.pending}</span>
+      <span class="stat-label">Pending</span>
+    </div>
+    <div class="stat-card success">
+      <span class="stat-value">{stats.settled}</span>
+      <span class="stat-label">Settled</span>
+    </div>
   </div>
+
+  {#if balance && balance.balance > 0}
+    <div class="balance-card">
+      <div class="balance-visual">
+        <div class="balance-avatar from">{balance.owes_from?.charAt(0)}</div>
+        <div class="balance-arrow">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </div>
+        <div class="balance-avatar to">{balance.owes_to?.charAt(0)}</div>
+      </div>
+      <div class="balance-content">
+        <p class="balance-text">
+          <strong>{balance.owes_from}</strong> owes <strong>{balance.owes_to}</strong>
+        </p>
+        <span class="balance-amount">{formatCurrency(balance.balance)}</span>
+      </div>
+      <button class="btn-settle" onclick={() => showSettleModal = true}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Settle Up
+      </button>
+    </div>
+  {/if}
+
+  <div class="filter-section">
+    <div class="filter-pills">
+      <button class:active={!filters.status} onclick={() => { filters.status = ""; applyFilters(); }}>
+        All
+      </button>
+      <button class:active={filters.status === "pending"} onclick={() => { filters.status = "pending"; applyFilters(); }}>
+        Pending
+      </button>
+      <button class:active={filters.status === "settled"} onclick={() => { filters.status = "settled"; applyFilters(); }}>
+        Settled
+      </button>
+    </div>
+    <div class="filter-dropdowns">
+      <select bind:value={filters.category} onchange={applyFilters}>
+        <option value="">All Categories</option>
+        {#each categories as cat}
+          <option value={cat.value}>{cat.label}</option>
+        {/each}
+      </select>
+      <select bind:value={filters.expense_type} onchange={applyFilters}>
+        <option value="">All Types</option>
+        <option value="business">Business</option>
+        <option value="reimbursable">Reimbursable</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="expenses-list">
+    {#if expenses.length === 0}
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <line x1="12" y1="1" x2="12" y2="23"/>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+        </div>
+        <p>No expenses found</p>
+        <button class="btn-add" onclick={openAddForm}>Add your first expense</button>
+      </div>
+    {:else}
+      {#each expenses as expense, i}
+        <div class="expense-card" class:settled={expense.status === "settled"} style="animation-delay: {i * 40}ms">
+          <div class="expense-category-indicator" style="background: {getCategoryColor(expense.category)}"></div>
+          <div class="expense-content">
+            <div class="expense-header">
+              <div class="expense-badges">
+                <span class="badge category" style="--badge-color: {getCategoryColor(expense.category)}">
+                  {categories.find(c => c.value === expense.category)?.label || expense.category}
+                </span>
+                <span class="badge type">{expense.expense_type}</span>
+                {#if expense.status === "settled"}
+                  <span class="badge settled">Settled</span>
+                {/if}
+              </div>
+              <span class="expense-date">{formatDate(expense.date)}</span>
+            </div>
+            <p class="expense-desc">{expense.description}</p>
+            <div class="expense-footer">
+              <span class="expense-payer">
+                Paid by <strong>{expense.paid_by_name}</strong>
+              </span>
+              <span class="expense-split">{expense.split_ratio_a}/{expense.split_ratio_b}</span>
+            </div>
+          </div>
+          <div class="expense-right">
+            <span class="expense-amount">{formatCurrency(expense.amount)}</span>
+            <div class="expense-actions">
+              <button class="action-btn" onclick={() => openEditForm(expense)} title="Edit">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              <button class="action-btn danger" onclick={() => remove(expense.id)} title="Delete">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      {/each}
+    {/if}
+  </div>
+
+  {#if settlements.length > 0}
+    <div class="settlements-section">
+      <h3>Settlement History</h3>
+      <div class="settlements-list">
+        {#each settlements as s, i}
+          <div class="settlement-row" style="animation-delay: {i * 30}ms">
+            <div class="settlement-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <div class="settlement-info">
+              <span class="settlement-parties">{s.from_partner_name} paid {s.to_partner_name}</span>
+              <span class="settlement-date">{formatDate(s.date)}</span>
+            </div>
+            <span class="settlement-amount">{formatCurrency(s.amount)}</span>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
 </div>
 
 {#if showForm}
   <div class="modal-overlay" onclick={() => showForm = false}>
     <div class="modal" onclick={(e) => e.stopPropagation()}>
       <div class="modal-header">
-        <h3>{editingId ? "Edit Expense" : "Add Expense"}</h3>
+        <div>
+          <span class="modal-badge">{editingId ? "Edit" : "New"}</span>
+          <h3>{editingId ? "Edit Expense" : "Add Expense"}</h3>
+        </div>
         <button class="btn-close" onclick={() => showForm = false}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -209,24 +350,24 @@
         </button>
       </div>
       <form onsubmit={(e) => { e.preventDefault(); submitForm(); }}>
-        <div class="form-grid">
-          <div class="form-group">
+        <div class="form-row">
+          <div class="form-field">
             <label>Date</label>
             <input type="date" bind:value={form.date} required />
           </div>
-          <div class="form-group">
+          <div class="form-field">
             <label>Amount (CHF)</label>
             <input type="number" step="0.01" bind:value={form.amount} placeholder="0.00" required />
           </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-field">
           <label>Description</label>
           <input type="text" bind:value={form.description} placeholder="What was this expense for?" required />
         </div>
 
-        <div class="form-grid">
-          <div class="form-group">
+        <div class="form-row">
+          <div class="form-field">
             <label>Category</label>
             <select bind:value={form.category}>
               {#each categories as cat}
@@ -234,7 +375,7 @@
               {/each}
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-field">
             <label>Type</label>
             <select bind:value={form.expense_type}>
               <option value="business">Business (shared)</option>
@@ -243,38 +384,51 @@
           </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-field">
           <label>Paid By</label>
-          <select bind:value={form.paid_by}>
+          <div class="partner-select">
             {#each partners as partner}
-              <option value={partner.id}>{partner.name}</option>
+              <button
+                type="button"
+                class="partner-option"
+                class:active={form.paid_by === partner.id}
+                onclick={() => form.paid_by = partner.id}
+              >
+                <span class="partner-avatar">{partner.name.charAt(0)}</span>
+                <span>{partner.name}</span>
+              </button>
             {/each}
-          </select>
+          </div>
         </div>
 
         <div class="split-section">
           <label>Split Ratio</label>
-          <div class="split-row">
+          <div class="split-control">
             <div class="split-partner">
-              <span class="split-name">{partners[0]?.name || "A"}</span>
-              <span class="split-percent">{form.split_ratio_a}%</span>
+              <span class="partner-name">{partners[0]?.name || "A"}</span>
+              <span class="partner-share">{form.split_ratio_a}%</span>
             </div>
-            <input type="range" min="0" max="100" value={form.split_ratio_a} oninput={(e) => updateSplitA(e.target.value)} />
+            <div class="split-slider">
+              <input type="range" min="0" max="100" value={form.split_ratio_a} oninput={(e) => updateSplitA(e.target.value)} />
+              <div class="slider-track">
+                <div class="slider-fill" style="width: {form.split_ratio_a}%"></div>
+              </div>
+            </div>
             <div class="split-partner">
-              <span class="split-name">{partners[1]?.name || "B"}</span>
-              <span class="split-percent">{form.split_ratio_b}%</span>
+              <span class="partner-name">{partners[1]?.name || "B"}</span>
+              <span class="partner-share">{form.split_ratio_b}%</span>
             </div>
           </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-field">
           <label>Notes (optional)</label>
           <textarea bind:value={form.notes} placeholder="Additional notes..."></textarea>
         </div>
 
         <div class="form-actions">
-          <button type="button" class="btn-secondary" onclick={() => showForm = false}>Cancel</button>
-          <button type="submit" class="btn-primary">{editingId ? "Update" : "Add"} Expense</button>
+          <button type="button" class="btn-cancel" onclick={() => showForm = false}>Cancel</button>
+          <button type="submit" class="btn-submit">{editingId ? "Update" : "Add"} Expense</button>
         </div>
       </form>
     </div>
@@ -284,331 +438,231 @@
 {#if showSettleModal}
   <div class="modal-overlay" onclick={() => showSettleModal = false}>
     <div class="modal settle-modal" onclick={(e) => e.stopPropagation()}>
+      <div class="settle-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
       <h3>Settle Balance</h3>
-      <p>
-        Confirm that <strong>{balance.owes_from}</strong> has paid <strong>{balance.owes_to}</strong> the amount of <strong>{formatCurrency(balance.balance)}</strong>.
+      <p class="settle-desc">
+        Confirm that <strong>{balance?.owes_from}</strong> has paid <strong>{balance?.owes_to}</strong>
       </p>
+      <div class="settle-amount">{formatCurrency(balance?.balance)}</div>
       <p class="settle-note">This will mark all pending expenses as settled.</p>
       <div class="form-actions">
-        <button class="btn-secondary" onclick={() => showSettleModal = false}>Cancel</button>
-        <button class="btn-primary" onclick={settleBalance}>Confirm Settlement</button>
+        <button class="btn-cancel" onclick={() => showSettleModal = false}>Cancel</button>
+        <button class="btn-submit" onclick={settleBalance}>Confirm Settlement</button>
       </div>
-    </div>
-  </div>
-{/if}
-
-<div class="expenses-list">
-  {#if expenses.length === 0}
-    <div class="empty-state">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <line x1="12" y1="1" x2="12" y2="23"/>
-        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-      </svg>
-      <p>No expenses found</p>
-      <button class="btn-primary" onclick={openAddForm}>Add your first expense</button>
-    </div>
-  {:else}
-    {#each expenses as expense}
-      <div class="expense-card" class:settled={expense.status === "settled"}>
-        <div class="expense-main">
-          <div class="expense-meta">
-            <span class="expense-date">{formatDate(expense.date)}</span>
-            <span class="expense-category">{categories.find(c => c.value === expense.category)?.label || expense.category}</span>
-            <span class="expense-type">{expense.expense_type}</span>
-            {#if expense.status === "settled"}
-              <span class="expense-settled">Settled</span>
-            {/if}
-          </div>
-          <p class="expense-desc">{expense.description}</p>
-          <div class="expense-payer">
-            Paid by <strong>{expense.paid_by_name}</strong> · Split {expense.split_ratio_a}/{expense.split_ratio_b}
-          </div>
-        </div>
-        <div class="expense-right">
-          <span class="expense-amount">{formatCurrency(expense.amount)}</span>
-          <div class="expense-actions">
-            <button class="btn-icon" onclick={() => openEditForm(expense)} title="Edit">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-            </button>
-            <button class="btn-icon danger" onclick={() => remove(expense.id)} title="Delete">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    {/each}
-  {/if}
-</div>
-
-{#if settlements.length > 0}
-  <div class="card settlements-card">
-    <div class="card-header">
-      <h3>Settlement History</h3>
-    </div>
-    <div class="settlements-list">
-      {#each settlements as s}
-        <div class="settlement-row">
-          <span class="settlement-date">{formatDate(s.date)}</span>
-          <span class="settlement-parties">{s.from_partner_name} paid {s.to_partner_name}</span>
-          <span class="settlement-amount">{formatCurrency(s.amount)}</span>
-        </div>
-      {/each}
     </div>
   </div>
 {/if}
 
 <style>
+  .expenses-page {
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
   .page-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 1.5rem;
-    gap: 1rem;
-    flex-wrap: wrap;
   }
 
-  h1 { margin-bottom: 0.25rem; }
+  .page-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.03em;
+  }
 
   .subtitle {
-    margin: 0;
+    margin: 0.25rem 0 0;
     color: var(--color-text-secondary);
     font-size: 0.9375rem;
   }
 
-  .btn-primary {
+  .btn-add {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
     background: var(--color-primary);
     color: white;
-    display: inline-flex;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-add:hover {
+    background: var(--color-primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-card {
+    background: var(--color-surface);
+    border-radius: 12px;
+    padding: 1.25rem;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  .stat-card.pending { background: rgba(245, 158, 11, 0.08); }
+  .stat-card.success { background: rgba(16, 185, 129, 0.08); }
+
+  .stat-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-card.pending .stat-value { color: #d97706; }
+  .stat-card.success .stat-value { color: #059669; }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+  }
+
+  .balance-card {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-radius: 14px;
+    margin-bottom: 1.5rem;
+  }
+
+  .balance-visual {
+    display: flex;
     align-items: center;
     gap: 0.5rem;
   }
 
-  .btn-primary:hover {
-    background: var(--color-primary-hover);
-  }
-
-  .btn-secondary {
-    background: var(--color-surface);
-    color: var(--color-text);
-    border: 1px solid var(--color-border);
-  }
-
-  .btn-secondary:hover {
-    background: var(--color-bg);
-  }
-
-  .balance-banner {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 1.25rem;
-    background: var(--color-warning-light);
-    border-radius: var(--radius-lg);
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-
-  .balance-info {
+  .balance-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+    color: white;
+  }
+
+  .balance-avatar.from { background: #f59e0b; }
+  .balance-avatar.to { background: #059669; }
+
+  .balance-arrow {
     color: #92400e;
+    opacity: 0.5;
   }
 
-  .balance-actions {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
+  .balance-content {
+    flex: 1;
+  }
+
+  .balance-text {
+    margin: 0 0 0.25rem;
+    color: #78350f;
+    font-size: 0.9375rem;
   }
 
   .balance-amount {
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: #92400e;
   }
 
   .btn-settle {
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-md);
-    border: none;
-    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
     background: #92400e;
     color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
     cursor: pointer;
+    transition: all 0.2s ease;
   }
 
   .btn-settle:hover {
     background: #78350f;
+    transform: translateY(-1px);
   }
 
-  .card {
-    background: var(--color-surface);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-  }
-
-  .filter-bar {
-    padding: 1rem 1.25rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .filter-row {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .filter-row select {
-    min-width: 140px;
-  }
-
-  .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 1rem;
-  }
-
-  .modal {
-    background: var(--color-surface);
-    border-radius: var(--radius-xl);
-    padding: 0;
-    max-width: 480px;
-    width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-
-  .modal-header {
+  .filter-section {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--color-border-light);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
   }
 
-  .modal-header h3 {
-    margin: 0;
-  }
-
-  .btn-close {
-    background: transparent;
-    color: var(--color-text-muted);
+  .filter-pills {
+    display: flex;
+    gap: 0.375rem;
+    background: var(--color-surface);
     padding: 0.375rem;
-    border-radius: var(--radius-sm);
+    border-radius: 10px;
   }
 
-  .btn-close:hover {
-    background: var(--color-bg);
+  .filter-pills button {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    color: var(--color-text-secondary);
+    border: none;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .filter-pills button:hover {
     color: var(--color-text);
   }
 
-  .modal form {
-    padding: 1.5rem;
+  .filter-pills button.active {
+    background: var(--color-primary);
+    color: white;
   }
 
-  .settle-modal {
-    max-width: 400px;
-    padding: 1.5rem;
-  }
-
-  .settle-modal h3 {
-    margin: 0 0 1rem 0;
-  }
-
-  .settle-note {
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
-    margin-top: 0.5rem;
-  }
-
-  .form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-
-  .form-group {
-    margin-bottom: 1rem;
-  }
-
-  .form-group label {
-    display: block;
-    margin-bottom: 0.375rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: var(--color-text-secondary);
-  }
-
-  .form-group textarea {
-    min-height: 80px;
-    resize: vertical;
-  }
-
-  .split-section {
-    margin: 1.5rem 0;
-    padding: 1rem;
-    background: var(--color-bg);
-    border-radius: var(--radius-md);
-  }
-
-  .split-section label {
-    display: block;
-    margin-bottom: 0.75rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: var(--color-text-secondary);
-  }
-
-  .split-row {
+  .filter-dropdowns {
     display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .split-row input[type="range"] {
-    flex: 1;
-    padding: 0;
-    height: 6px;
-  }
-
-  .split-partner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 70px;
-  }
-
-  .split-name {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-  }
-
-  .split-percent {
-    font-size: 1.125rem;
-    font-weight: 600;
-  }
-
-  .form-actions {
-    display: flex;
-    justify-content: flex-end;
     gap: 0.75rem;
-    margin-top: 1.5rem;
+  }
+
+  .filter-dropdowns select {
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    background: var(--color-surface);
+    cursor: pointer;
   }
 
   .expenses-list {
@@ -619,83 +673,117 @@
 
   .expense-card {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding: 1rem 1.25rem;
     background: var(--color-surface);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    gap: 1rem;
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    overflow: hidden;
+    transition: all 0.2s ease;
+    animation: fadeIn 0.4s ease backwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .expense-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    transform: translateY(-1px);
   }
 
   .expense-card.settled {
-    opacity: 0.7;
+    opacity: 0.6;
   }
 
-  .expense-main {
+  .expense-category-indicator {
+    width: 4px;
+    flex-shrink: 0;
+  }
+
+  .expense-content {
     flex: 1;
+    padding: 1rem 1.25rem;
+    min-width: 0;
   }
 
-  .expense-meta {
+  .expense-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+  }
+
+  .expense-badges {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .badge {
+    padding: 0.25rem 0.625rem;
+    border-radius: 6px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .badge.category {
+    background: color-mix(in srgb, var(--badge-color) 15%, transparent);
+    color: var(--badge-color);
+  }
+
+  .badge.type {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+  }
+
+  .badge.settled {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
   }
 
   .expense-date {
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
-  }
-
-  .expense-category {
     font-size: 0.75rem;
-    font-weight: 500;
-    padding: 0.125rem 0.5rem;
-    background: var(--color-border-light);
-    border-radius: var(--radius-sm);
-  }
-
-  .expense-type {
-    font-size: 0.75rem;
-    font-weight: 500;
-    padding: 0.125rem 0.5rem;
-    background: var(--color-primary-light);
-    color: var(--color-primary);
-    border-radius: var(--radius-sm);
-    text-transform: capitalize;
-  }
-
-  .expense-settled {
-    font-size: 0.75rem;
-    font-weight: 500;
-    padding: 0.125rem 0.5rem;
-    background: var(--color-success-light);
-    color: #065f46;
-    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
   }
 
   .expense-desc {
-    margin: 0 0 0.375rem 0;
-    font-weight: 500;
+    margin: 0 0 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--color-text);
   }
 
-  .expense-payer {
+  .expense-footer {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
     font-size: 0.8125rem;
     color: var(--color-text-secondary);
+  }
+
+  .expense-split {
+    padding: 0.125rem 0.5rem;
+    background: var(--color-bg);
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
   }
 
   .expense-right {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 0.5rem;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    background: var(--color-bg);
   }
 
   .expense-amount {
-    font-size: 1.125rem;
-    font-weight: 600;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
 
   .expense-actions {
@@ -703,21 +791,24 @@
     gap: 0.25rem;
   }
 
-  .btn-icon {
+  .action-btn {
+    padding: 0.375rem;
     background: transparent;
-    color: var(--color-text-secondary);
-    padding: 0.5rem;
-    border-radius: var(--radius-sm);
+    border: none;
+    border-radius: 6px;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
   }
 
-  .btn-icon:hover {
-    background: var(--color-bg);
+  .action-btn:hover {
+    background: var(--color-surface);
     color: var(--color-text);
   }
 
-  .btn-icon.danger:hover {
-    background: var(--color-danger-light);
-    color: var(--color-danger);
+  .action-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
   }
 
   .empty-state {
@@ -726,32 +817,47 @@
     align-items: center;
     justify-content: center;
     padding: 4rem 2rem;
-    color: var(--color-text-muted);
     background: var(--color-surface);
-    border-radius: var(--radius-lg);
+    border-radius: 16px;
+    text-align: center;
   }
 
-  .empty-state svg {
-    margin-bottom: 1rem;
+  .empty-icon {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: var(--color-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .empty-icon svg {
+    color: var(--color-text-muted);
     opacity: 0.4;
   }
 
   .empty-state p {
-    margin-bottom: 1rem;
+    color: var(--color-text-secondary);
+    margin: 0 0 1.5rem;
+    font-size: 1rem;
   }
 
-  .settlements-card {
+  .settlements-section {
     margin-top: 2rem;
+    background: var(--color-surface);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
 
-  .card-header {
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--color-border-light);
-  }
-
-  .card-header h3 {
+  .settlements-section h3 {
+    padding: 1.25rem 1.5rem;
     margin: 0;
     font-size: 1rem;
+    font-weight: 600;
+    border-bottom: 1px solid var(--color-border-light);
   }
 
   .settlements-list {
@@ -762,52 +868,432 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 0.75rem 1.25rem;
+    padding: 0.875rem 1.5rem;
+    animation: fadeIn 0.4s ease backwards;
   }
 
   .settlement-row:not(:last-child) {
     border-bottom: 1px solid var(--color-border-light);
   }
 
-  .settlement-date {
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
-    min-width: 80px;
+  .settlement-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .settlement-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
   }
 
   .settlement-parties {
-    flex: 1;
-    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+
+  .settlement-date {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
   }
 
   .settlement-amount {
-    font-weight: 600;
-    color: var(--color-success);
+    font-weight: 700;
+    color: #059669;
+    font-size: 1rem;
   }
 
-  @media (max-width: 640px) {
-    .page-header {
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .modal {
+    background: var(--color-surface);
+    border-radius: 20px;
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1.5rem 1.5rem 1rem;
+  }
+
+  .modal-badge {
+    display: inline-block;
+    background: var(--color-primary);
+    color: white;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.375rem;
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .btn-close {
+    padding: 0.375rem;
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-close:hover {
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  .modal form {
+    padding: 0 1.5rem 1.5rem;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .form-field {
+    margin-bottom: 1rem;
+  }
+
+  .form-field label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.375rem;
+  }
+
+  .form-field input,
+  .form-field select,
+  .form-field textarea {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 0.9375rem;
+    background: white;
+    transition: all 0.2s ease;
+  }
+
+  .form-field input:focus,
+  .form-field select:focus,
+  .form-field textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .form-field textarea {
+    min-height: 80px;
+    resize: vertical;
+  }
+
+  .partner-select {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .partner-option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.75rem;
+    background: var(--color-bg);
+    border: 2px solid transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .partner-option:hover {
+    background: var(--color-border-light);
+  }
+
+  .partner-option.active {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+  }
+
+  .partner-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--color-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  .split-section {
+    margin: 1.5rem 0;
+    padding: 1.25rem;
+    background: var(--color-bg);
+    border-radius: 12px;
+  }
+
+  .split-section > label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 1rem;
+  }
+
+  .split-control {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .split-partner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 70px;
+  }
+
+  .partner-name {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+  }
+
+  .partner-share {
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .split-slider {
+    flex: 1;
+    position: relative;
+  }
+
+  .split-slider input {
+    width: 100%;
+    height: 6px;
+    opacity: 0;
+    position: relative;
+    z-index: 2;
+    cursor: pointer;
+  }
+
+  .slider-track {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: var(--color-border);
+    border-radius: 3px;
+    transform: translateY(-50%);
+  }
+
+  .slider-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 3px;
+    transition: width 0.1s ease;
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border-light);
+    margin-top: 1rem;
+  }
+
+  .btn-cancel {
+    padding: 0.625rem 1.25rem;
+    background: white;
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-cancel:hover {
+    background: var(--color-bg);
+  }
+
+  .btn-submit {
+    padding: 0.625rem 1.5rem;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-submit:hover {
+    background: var(--color-primary-hover);
+    transform: translateY(-1px);
+  }
+
+  .settle-modal {
+    max-width: 400px;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  .settle-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+  }
+
+  .settle-modal h3 {
+    margin: 0 0 0.75rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .settle-desc {
+    color: var(--color-text-secondary);
+    margin: 0 0 1rem;
+  }
+
+  .settle-amount {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #059669;
+    margin-bottom: 1rem;
+  }
+
+  .settle-note {
+    font-size: 0.8125rem;
+    color: var(--color-text-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .settle-modal .form-actions {
+    justify-content: center;
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+  }
+
+  @media (max-width: 768px) {
+    .stats-row {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .balance-card {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .balance-visual {
+      justify-content: center;
+    }
+
+    .filter-section {
       flex-direction: column;
       align-items: stretch;
     }
 
-    .page-header button {
-      width: 100%;
+    .filter-pills {
       justify-content: center;
     }
 
-    .form-grid {
-      grid-template-columns: 1fr;
+    .filter-dropdowns {
+      justify-content: center;
     }
 
     .expense-card {
       flex-direction: column;
     }
 
+    .expense-category-indicator {
+      width: 100%;
+      height: 4px;
+    }
+
     .expense-right {
       flex-direction: row;
-      width: 100%;
       justify-content: space-between;
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .page-header {
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .btn-add {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+
+    .partner-select {
+      flex-direction: column;
     }
 
     .form-actions {
@@ -815,6 +1301,15 @@
     }
 
     .form-actions button {
+      width: 100%;
+    }
+
+    .split-control {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .split-slider {
       width: 100%;
     }
   }

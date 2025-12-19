@@ -136,6 +136,36 @@ def init_db():
             chat_id TEXT NOT NULL
         )''')
 
+        c.execute('''CREATE TABLE IF NOT EXISTS todos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT,
+            due_date TEXT,
+            priority TEXT DEFAULT 'medium',
+            status TEXT DEFAULT 'pending',
+            client_id INTEGER,
+            invoice_id INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            completed_at TEXT,
+            FOREIGN KEY (client_id) REFERENCES clients(id),
+            FOREIGN KEY (invoice_id) REFERENCES invoices(id)
+        )''')
+
+        c.execute('''CREATE TABLE IF NOT EXISTS calendar_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT,
+            start_datetime TEXT NOT NULL,
+            end_datetime TEXT,
+            all_day INTEGER DEFAULT 0,
+            event_type TEXT DEFAULT 'appointment',
+            client_id INTEGER,
+            color TEXT DEFAULT '#4a90e2',
+            reminder_minutes INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (client_id) REFERENCES clients(id)
+        )''')
+
         c.execute("SELECT COUNT(*) FROM bank_details")
         if c.fetchone()[0] == 0:
             c.execute('''INSERT INTO bank_details
@@ -809,7 +839,7 @@ def update_template_content(template_id: int, content: dict):
 
 @app.post("/templates/{template_id}/preview")
 def preview_template(template_id: int, preview_data: dict = None):
-    from jinja2 import Environment, FileSystemLoader
+    from jinja2 import Environment, FileSystemLoader, UndefinedError
 
     with db() as conn:
         c = conn.cursor()
@@ -828,29 +858,43 @@ def preview_template(template_id: int, preview_data: dict = None):
 
         sample_data = preview_data or {
             "invoice_number": "INV-2024-001",
-            "date": "2024-12-19",
+            "invoice_date": "19.12.2024",
+            "date": "19.12.2024",
+            "logo": "",
+            "logo_box_width": 120,
+            "logo_box_height": 60,
+            "customer": {
+                "name": "Sample Client AG",
+                "address": "Musterstrasse 123",
+                "city": "Zurich",
+                "zip": "8000",
+                "country": "Switzerland"
+            },
             "client": {
-                "name": "Sample Client",
-                "address": "123 Example Street",
+                "name": "Sample Client AG",
+                "address": "Musterstrasse 123",
                 "cap": "8000",
                 "city": "Zurich",
                 "nation": "CH",
                 "email": "client@example.com"
             },
             "items": [
-                {"desc": "Web Development", "price": 1500, "qty": 1},
-                {"desc": "Hosting (annual)", "price": 300, "qty": 1}
+                {"desc": "Web Development", "price": "1'500.00", "qty": 1, "total": "1'500.00"},
+                {"desc": "Hosting (annual)", "price": "300.00", "qty": 1, "total": "300.00"}
             ],
-            "subtotal": 1800,
-            "total": 1800,
+            "subtotal": "1'800.00",
+            "total": "1'800.00",
+            "notes": "Payment due within 30 days.",
+            "thank_you_message": "Thank you for your business!",
             "qr_image": ""
         }
 
-        env = Environment(loader=FileSystemLoader(template_path))
-        template = env.get_template(html_filename)
-        rendered_html = template.render(**sample_data)
+        try:
+            env = Environment(loader=FileSystemLoader(template_path))
+            template = env.get_template(html_filename)
+            rendered_html = template.render(**sample_data)
 
-        full_html = f"""<!DOCTYPE html>
+            full_html = f"""<!DOCTYPE html>
 <html>
 <head>
 <style>{css_content}</style>
@@ -858,7 +902,11 @@ def preview_template(template_id: int, preview_data: dict = None):
 <body>{rendered_html}</body>
 </html>"""
 
-        return {"html": full_html}
+            return {"html": full_html}
+        except UndefinedError as e:
+            return {"html": f"<p style='color:red;padding:20px;'>Template error: Missing variable - {str(e)}</p>"}
+        except Exception as e:
+            return {"html": f"<p style='color:red;padding:20px;'>Preview error: {str(e)}</p>"}
 
 @app.get("/templates/{template_id}/fields")
 def get_template_fields(template_id: int):
@@ -1760,4 +1808,164 @@ def generate_invoice_from_recurring(fee_id: int):
 
         conn.commit()
         return {"invoice_id": invoice_id, "invoice_number": invoice_number}
+
+@app.get("/todos")
+def get_todos(status: str = None, priority: str = None, client_id: int = None):
+    with db() as conn:
+        c = conn.cursor()
+        query = """
+            SELECT t.*, c.name as client_name
+            FROM todos t
+            LEFT JOIN clients c ON t.client_id = c.id
+            WHERE 1=1
+        """
+        params = []
+        if status:
+            query += " AND t.status = ?"
+            params.append(status)
+        if priority:
+            query += " AND t.priority = ?"
+            params.append(priority)
+        if client_id:
+            query += " AND t.client_id = ?"
+            params.append(client_id)
+        query += " ORDER BY CASE t.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, t.due_date ASC NULLS LAST, t.created_at DESC"
+        c.execute(query, params)
+        rows = c.fetchall()
+        cols = [desc[0] for desc in c.description]
+        return [dict(zip(cols, row)) for row in rows]
+
+@app.post("/todos")
+def create_todo(todo: dict = Body(...)):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO todos (title, description, due_date, priority, status, client_id, invoice_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            todo.get("title"),
+            todo.get("description"),
+            todo.get("due_date"),
+            todo.get("priority", "medium"),
+            todo.get("status", "pending"),
+            todo.get("client_id"),
+            todo.get("invoice_id")
+        ))
+        conn.commit()
+        return {"id": c.lastrowid, "ok": True}
+
+@app.put("/todos/{todo_id}")
+def update_todo(todo_id: int, todo: dict = Body(...)):
+    from datetime import datetime
+    with db() as conn:
+        c = conn.cursor()
+        completed_at = None
+        if todo.get("status") == "completed":
+            c.execute("SELECT completed_at FROM todos WHERE id=?", (todo_id,))
+            row = c.fetchone()
+            if row and not row[0]:
+                completed_at = datetime.now().isoformat()
+            elif row:
+                completed_at = row[0]
+        c.execute("""
+            UPDATE todos SET title=?, description=?, due_date=?, priority=?, status=?, client_id=?, invoice_id=?, completed_at=?
+            WHERE id=?
+        """, (
+            todo.get("title"),
+            todo.get("description"),
+            todo.get("due_date"),
+            todo.get("priority"),
+            todo.get("status"),
+            todo.get("client_id"),
+            todo.get("invoice_id"),
+            completed_at,
+            todo_id
+        ))
+        conn.commit()
+        return {"ok": True}
+
+@app.delete("/todos/{todo_id}")
+def delete_todo(todo_id: int):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM todos WHERE id=?", (todo_id,))
+        conn.commit()
+        return {"ok": True}
+
+@app.get("/calendar/events")
+def get_calendar_events(start: str = None, end: str = None, client_id: int = None):
+    with db() as conn:
+        c = conn.cursor()
+        query = """
+            SELECT e.*, c.name as client_name
+            FROM calendar_events e
+            LEFT JOIN clients c ON e.client_id = c.id
+            WHERE 1=1
+        """
+        params = []
+        if start:
+            query += " AND e.start_datetime >= ?"
+            params.append(start)
+        if end:
+            query += " AND e.start_datetime <= ?"
+            params.append(end)
+        if client_id:
+            query += " AND e.client_id = ?"
+            params.append(client_id)
+        query += " ORDER BY e.start_datetime ASC"
+        c.execute(query, params)
+        rows = c.fetchall()
+        cols = [desc[0] for desc in c.description]
+        return [dict(zip(cols, row)) for row in rows]
+
+@app.post("/calendar/events")
+def create_calendar_event(event: dict = Body(...)):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO calendar_events (title, description, start_datetime, end_datetime, all_day, event_type, client_id, color, reminder_minutes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            event.get("title"),
+            event.get("description"),
+            event.get("start_datetime"),
+            event.get("end_datetime"),
+            1 if event.get("all_day") else 0,
+            event.get("event_type", "appointment"),
+            event.get("client_id"),
+            event.get("color", "#4a90e2"),
+            event.get("reminder_minutes")
+        ))
+        conn.commit()
+        return {"id": c.lastrowid, "ok": True}
+
+@app.put("/calendar/events/{event_id}")
+def update_calendar_event(event_id: int, event: dict = Body(...)):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("""
+            UPDATE calendar_events SET title=?, description=?, start_datetime=?, end_datetime=?, all_day=?, event_type=?, client_id=?, color=?, reminder_minutes=?
+            WHERE id=?
+        """, (
+            event.get("title"),
+            event.get("description"),
+            event.get("start_datetime"),
+            event.get("end_datetime"),
+            1 if event.get("all_day") else 0,
+            event.get("event_type"),
+            event.get("client_id"),
+            event.get("color"),
+            event.get("reminder_minutes"),
+            event_id
+        ))
+        conn.commit()
+        return {"ok": True}
+
+@app.delete("/calendar/events/{event_id}")
+def delete_calendar_event(event_id: int):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM calendar_events WHERE id=?", (event_id,))
+        conn.commit()
+        return {"ok": True}
 
