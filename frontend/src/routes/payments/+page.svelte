@@ -5,6 +5,7 @@
     updatePaymentEvent,
     deletePaymentEvent,
     getClients,
+    generateInvoiceFromRecurring,
   } from "$lib/api.js";
 
   let events = [];
@@ -13,6 +14,7 @@
   let selectedClient = "";
   let selectedStatus = "";
   let todayDate = new Date().toISOString().split("T")[0];
+  let creatingInvoice = null;
 
   async function load() {
     clients = await getClients();
@@ -44,10 +46,26 @@
   }
 
   async function removeEvent(eventId) {
-    if (confirm("Are you sure you want to delete this payment event?")) {
+    if (confirm("Delete this payment event?")) {
       await deletePaymentEvent(eventId);
       await loadEvents();
     }
+  }
+
+  async function createInvoiceFromEvent(event) {
+    if (!event.recurring_fee_id) {
+      alert("This event is not linked to a recurring fee.");
+      return;
+    }
+    creatingInvoice = event.id;
+    try {
+      const result = await generateInvoiceFromRecurring(event.recurring_fee_id);
+      alert(`Invoice #${result.invoice_number} created!`);
+      await loadEvents();
+    } catch (e) {
+      alert("Failed to create invoice.");
+    }
+    creatingInvoice = null;
   }
 
   function formatDate(dateStr) {
@@ -55,9 +73,13 @@
     const date = new Date(dateStr);
     return date.toLocaleDateString("de-CH", {
       day: "2-digit",
-      month: "2-digit",
+      month: "short",
       year: "numeric",
     });
+  }
+
+  function formatCurrency(amount) {
+    return new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF' }).format(amount || 0);
   }
 
   function isOverdue(dueDate, status) {
@@ -77,516 +99,532 @@
   $: futureEvents = events.filter((e) => isFuture(e.due_date));
   $: notSentCount = events.filter((e) => e.status === "not_sent").length;
   $: sentCount = events.filter((e) => e.status === "sent").length;
-  $: overdueCount = events.filter((e) =>
-    isOverdue(e.due_date, e.status)
-  ).length;
+  $: overdueCount = events.filter((e) => isOverdue(e.due_date, e.status)).length;
   $: totalUnpaid = events
     .filter((e) => e.status !== "paid")
     .reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
 </script>
 
-<h2>Payment Events Timeline</h2>
-
-<div class="stats">
-  <div class="stat-card">
-    <div class="stat-value">{notSentCount}</div>
-    <div class="stat-label">Not Sent</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-value">{sentCount}</div>
-    <div class="stat-label">Sent</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-value">{overdueCount}</div>
-    <div class="stat-label">Overdue</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-value">{totalUnpaid.toFixed(2)} CHF</div>
-    <div class="stat-label">Total Unpaid</div>
+<div class="page-header">
+  <div>
+    <h1>Payments</h1>
+    <p class="subtitle">Track payment events and renewals</p>
   </div>
 </div>
 
-<div class="filters">
-  <div class="filter-group">
-    <label for="filter-client">Filter by Client:</label>
-    <select
-      id="filter-client"
-      bind:value={selectedClient}
-      on:change={loadEvents}
-    >
-      <option value="">All Clients</option>
-      {#each clients as client}
-        <option value={client.id}>{client.name}</option>
-      {/each}
-    </select>
+<div class="stats-row">
+  <div class="stat-card">
+    <span class="stat-value danger">{notSentCount}</span>
+    <span class="stat-label">Not Sent</span>
   </div>
+  <div class="stat-card">
+    <span class="stat-value warning">{sentCount}</span>
+    <span class="stat-label">Sent</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-value" class:danger={overdueCount > 0}>{overdueCount}</span>
+    <span class="stat-label">Overdue</span>
+  </div>
+  <div class="stat-card primary">
+    <span class="stat-value">{formatCurrency(totalUnpaid)}</span>
+    <span class="stat-label">Total Unpaid</span>
+  </div>
+</div>
 
-  <div class="filter-group">
-    <label for="filter-status">Filter by Status:</label>
-    <select
-      id="filter-status"
-      bind:value={selectedStatus}
-      on:change={loadEvents}
-    >
-      <option value="">All Statuses</option>
-      <option value="not_sent">Not Sent</option>
-      <option value="sent">Sent</option>
-      <option value="paid">Paid</option>
-    </select>
+<div class="card filter-card">
+  <div class="filter-row">
+    <div class="filter-group">
+      <label>Client</label>
+      <select bind:value={selectedClient} onchange={loadEvents}>
+        <option value="">All Clients</option>
+        {#each clients as client}
+          <option value={client.id}>{client.name}</option>
+        {/each}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Status</label>
+      <select bind:value={selectedStatus} onchange={loadEvents}>
+        <option value="">All</option>
+        <option value="not_sent">Not Sent</option>
+        <option value="sent">Sent</option>
+        <option value="paid">Paid</option>
+      </select>
+    </div>
   </div>
 </div>
 
 <div class="timeline">
   {#if futureEvents.length > 0}
     <div class="timeline-section">
-      <h3 class="section-title future">Upcoming Payments</h3>
-      {#each futureEvents as event}
-        <div class="event-card future">
-          <div class="event-header">
-            <div class="event-info">
-              <span class="client-name">{event.client_name}</span>
-              <span class="event-amount"
-                >{event.amount} {event.currency}</span
-              >
-            </div>
-            <div class="event-meta">
+      <div class="section-label upcoming">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        Upcoming
+      </div>
+      <div class="events-list">
+        {#each futureEvents as event}
+          <div class="event-card">
+            <div class="event-left">
               <span class="event-date">{formatDate(event.due_date)}</span>
-              <span class="status-badge {event.status}">{event.status}</span>
+              <div class="event-details">
+                <span class="event-client">{event.client_name}</span>
+                {#if event.description}
+                  <span class="event-desc">{event.description}</span>
+                {/if}
+              </div>
+            </div>
+            <div class="event-right">
+              <span class="event-amount">{formatCurrency(event.amount)}</span>
+              <span class="status-badge {event.status}">{event.status.replace('_', ' ')}</span>
+              <div class="event-actions">
+                {#if event.status === "not_sent"}
+                  <button class="btn-xs sent" onclick={() => markAsSent(event.id)}>Send</button>
+                {:else if event.status === "sent"}
+                  <button class="btn-xs paid" onclick={() => markAsPaid(event.id)}>Paid</button>
+                {/if}
+                {#if event.recurring_fee_id && event.status !== "paid" && !event.invoice_id}
+                  <button class="btn-xs invoice" onclick={() => createInvoiceFromEvent(event)} disabled={creatingInvoice === event.id}>
+                    {creatingInvoice === event.id ? "..." : "Invoice"}
+                  </button>
+                {/if}
+                <button class="btn-icon danger" onclick={() => removeEvent(event.id)} title="Delete">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-          {#if event.description}
-            <div class="event-description">{event.description}</div>
-          {/if}
-          <div class="event-actions">
-            {#if event.status === "not_sent"}
-              <button class="mark-sent-btn" on:click={() => markAsSent(event.id)}
-                >Mark as Sent</button
-              >
-            {:else if event.status === "sent"}
-              <button class="mark-paid-btn" on:click={() => markAsPaid(event.id)}
-                >Mark as Paid</button
-              >
-              <button
-                class="mark-not-sent-btn"
-                on:click={() => markAsNotSent(event.id)}>Back to Not Sent</button
-              >
-            {:else if event.status === "paid"}
-              <button
-                class="mark-sent-btn"
-                on:click={() => markAsSent(event.id)}>Back to Sent</button
-              >
-            {/if}
-            {#if event.invoice_id}
-              <a href="/invoices" class="invoice-link">View Invoice</a>
-            {/if}
-            <button class="delete-btn" on:click={() => removeEvent(event.id)}
-              >Delete</button
-            >
-          </div>
-        </div>
-      {/each}
+        {/each}
+      </div>
     </div>
   {/if}
 
-  <div class="today-marker">
-    <div class="today-line"></div>
-    <span class="today-label">Today</span>
-    <div class="today-line"></div>
+  <div class="today-divider">
+    <span>Today</span>
   </div>
 
   {#if pastEvents.length > 0}
     <div class="timeline-section">
-      <h3 class="section-title past">Past Payments</h3>
-      {#each pastEvents as event}
-        <div
-          class="event-card past {isOverdue(event.due_date, event.status)
-            ? 'overdue'
-            : ''}"
-        >
-          <div class="event-header">
-            <div class="event-info">
-              <span class="client-name">{event.client_name}</span>
-              <span class="event-amount"
-                >{event.amount} {event.currency}</span
-              >
-            </div>
-            <div class="event-meta">
+      <div class="section-label past">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 3v5h5"/>
+          <path d="M21 12A9 9 0 0 0 6 5.3L3 8"/>
+        </svg>
+        Past
+      </div>
+      <div class="events-list">
+        {#each pastEvents as event}
+          <div class="event-card" class:overdue={isOverdue(event.due_date, event.status)}>
+            <div class="event-left">
               <span class="event-date">{formatDate(event.due_date)}</span>
-              <span class="status-badge {event.status}">{event.status}</span>
-              {#if isOverdue(event.due_date, event.status)}
-                <span class="overdue-badge">OVERDUE</span>
-              {/if}
+              <div class="event-details">
+                <span class="event-client">{event.client_name}</span>
+                {#if event.description}
+                  <span class="event-desc">{event.description}</span>
+                {/if}
+              </div>
+            </div>
+            <div class="event-right">
+              <span class="event-amount">{formatCurrency(event.amount)}</span>
+              <div class="status-group">
+                <span class="status-badge {event.status}">{event.status.replace('_', ' ')}</span>
+                {#if isOverdue(event.due_date, event.status)}
+                  <span class="overdue-badge">Overdue</span>
+                {/if}
+              </div>
+              <div class="event-actions">
+                {#if event.status === "not_sent"}
+                  <button class="btn-xs sent" onclick={() => markAsSent(event.id)}>Send</button>
+                {:else if event.status === "sent"}
+                  <button class="btn-xs paid" onclick={() => markAsPaid(event.id)}>Paid</button>
+                {/if}
+                {#if event.recurring_fee_id && event.status !== "paid" && !event.invoice_id}
+                  <button class="btn-xs invoice" onclick={() => createInvoiceFromEvent(event)} disabled={creatingInvoice === event.id}>
+                    {creatingInvoice === event.id ? "..." : "Invoice"}
+                  </button>
+                {/if}
+                <button class="btn-icon danger" onclick={() => removeEvent(event.id)} title="Delete">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-          {#if event.description}
-            <div class="event-description">{event.description}</div>
-          {/if}
-          {#if event.paid_date}
-            <div class="paid-info">Paid on: {formatDate(event.paid_date)}</div>
-          {/if}
-          <div class="event-actions">
-            {#if event.status === "not_sent"}
-              <button class="mark-sent-btn" on:click={() => markAsSent(event.id)}
-                >Mark as Sent</button
-              >
-            {:else if event.status === "sent"}
-              <button class="mark-paid-btn" on:click={() => markAsPaid(event.id)}
-                >Mark as Paid</button
-              >
-              <button
-                class="mark-not-sent-btn"
-                on:click={() => markAsNotSent(event.id)}>Back to Not Sent</button
-              >
-            {:else if event.status === "paid"}
-              <button
-                class="mark-sent-btn"
-                on:click={() => markAsSent(event.id)}>Back to Sent</button
-              >
-            {/if}
-            {#if event.invoice_id}
-              <a href="/invoices" class="invoice-link">View Invoice</a>
-            {/if}
-            <button class="delete-btn" on:click={() => removeEvent(event.id)}
-              >Delete</button
-            >
-          </div>
-        </div>
-      {/each}
+        {/each}
+      </div>
     </div>
   {/if}
 
   {#if events.length === 0}
-    <div class="no-events">
-      <p>No payment events found.</p>
-      <p>Add recurring fees to clients to generate payment events.</p>
+    <div class="empty-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+      <p>No payment events yet</p>
+      <p class="empty-hint">Add recurring fees to clients to generate payment events</p>
     </div>
   {/if}
 </div>
 
 <style>
-  h2 {
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
     margin-bottom: 1.5rem;
-    color: var(--text-primary-color);
   }
 
-  .stats {
+  h1 { margin-bottom: 0.25rem; }
+
+  .subtitle {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 0.9375rem;
+  }
+
+  .stats-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 1rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
   }
 
   .stat-card {
-    background-color: var(--surface-color);
-    padding: 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-    text-align: center;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-card.primary {
+    background: linear-gradient(135deg, var(--color-primary) 0%, #2563eb 100%);
+    color: white;
+  }
+
+  .stat-card.primary .stat-label {
+    color: rgba(255, 255, 255, 0.8);
   }
 
   .stat-value {
-    font-size: 2rem;
+    font-size: 1.5rem;
     font-weight: 700;
-    color: var(--primary-color);
-    margin-bottom: 0.5rem;
+    line-height: 1.2;
+  }
+
+  .stat-value.danger {
+    color: var(--color-danger);
+  }
+
+  .stat-value.warning {
+    color: var(--color-warning);
   }
 
   .stat-label {
-    color: var(--text-secondary-color);
-    font-size: 0.9rem;
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    margin-top: 0.25rem;
   }
 
-  .filters {
+  .card {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .filter-card {
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .filter-row {
     display: flex;
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-    padding: 1.5rem;
-    background-color: var(--surface-color);
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    gap: 1rem;
   }
 
   .filter-group {
-    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
   }
 
   .filter-group label {
-    display: block;
-    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
     font-weight: 500;
-    color: var(--text-primary-color);
+    color: var(--color-text-secondary);
   }
 
   .filter-group select {
-    width: 100%;
+    min-width: 160px;
   }
 
   .timeline {
-    margin-top: 2rem;
+    margin-top: 1rem;
   }
 
   .timeline-section {
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
   }
 
-  .section-title {
-    font-size: 1.3rem;
+  .section-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
     font-weight: 600;
-    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
     border-bottom: 2px solid;
   }
 
-  .section-title.future {
-    color: var(--primary-color);
-    border-color: var(--primary-color);
+  .section-label.upcoming {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
   }
 
-  .section-title.past {
-    color: var(--text-secondary-color);
-    border-color: var(--border-color);
+  .section-label.past {
+    color: var(--color-text-muted);
+    border-color: var(--color-border);
   }
 
-  .today-marker {
+  .today-divider {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin: 2rem 0;
+    margin: 1.5rem 0;
   }
 
-  .today-line {
+  .today-divider::before,
+  .today-divider::after {
+    content: "";
     flex: 1;
-    height: 2px;
-    background: linear-gradient(
-      to right,
-      var(--border-color),
-      var(--primary-color),
-      var(--border-color)
-    );
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--color-border), transparent);
   }
 
-  .today-label {
-    font-weight: 700;
-    color: var(--primary-color);
-    padding: 0.25rem 1rem;
-    background-color: var(--surface-color);
-    border: 2px solid var(--primary-color);
-    border-radius: 20px;
-    font-size: 0.9rem;
-  }
-
-  .event-card {
-    background-color: var(--surface-color);
-    border-left: 4px solid var(--primary-color);
-    padding: 1.25rem;
-    border-radius: 6px;
-    margin-bottom: 1rem;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-    transition: box-shadow 0.2s ease;
-  }
-
-  .event-card:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  }
-
-  .event-card.past {
-    border-left-color: var(--text-secondary-color);
-  }
-
-  .event-card.overdue {
-    border-left-color: #e53e3e;
-    background-color: #fff5f5;
-  }
-
-  .event-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 0.75rem;
-  }
-
-  .event-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .client-name {
+  .today-divider span {
+    padding: 0.375rem 1rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    font-size: 1.1rem;
-    color: var(--text-primary-color);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-primary);
+    background: var(--color-primary-light);
+    border-radius: 999px;
   }
 
-  .event-amount {
-    font-size: 1.3rem;
-    font-weight: 700;
-    color: var(--primary-color);
-  }
-
-  .event-meta {
+  .events-list {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
     gap: 0.5rem;
   }
 
+  .event-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    border-left: 3px solid var(--color-primary);
+  }
+
+  .event-card.overdue {
+    border-left-color: var(--color-danger);
+    background: var(--color-danger-light);
+  }
+
+  .event-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
   .event-date {
-    color: var(--text-secondary-color);
-    font-size: 0.95rem;
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    min-width: 80px;
+  }
+
+  .event-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .event-client {
+    font-weight: 600;
+  }
+
+  .event-desc {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+  }
+
+  .event-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .event-amount {
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  .status-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
   }
 
   .status-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 12px;
-    font-size: 0.8rem;
+    display: inline-block;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    font-size: 0.6875rem;
     font-weight: 600;
     text-transform: uppercase;
   }
 
   .status-badge.not_sent {
-    background-color: #fee2e2;
+    background: var(--color-danger-light);
     color: #991b1b;
   }
 
   .status-badge.sent {
-    background-color: #fef3c7;
+    background: var(--color-warning-light);
     color: #92400e;
   }
 
   .status-badge.paid {
-    background-color: #d1fae5;
+    background: var(--color-success-light);
     color: #065f46;
   }
 
   .overdue-badge {
-    background-color: #e53e3e;
-    color: white;
-    padding: 0.25rem 0.75rem;
-    border-radius: 12px;
-    font-size: 0.75rem;
+    font-size: 0.625rem;
     font-weight: 700;
-  }
-
-  .event-description {
-    color: var(--text-secondary-color);
-    font-style: italic;
-    margin-bottom: 0.75rem;
-    font-size: 0.95rem;
-  }
-
-  .paid-info {
-    color: var(--success-color);
-    font-size: 0.9rem;
-    font-weight: 500;
-    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: var(--color-danger);
+    color: white;
   }
 
   .event-actions {
     display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .event-actions button,
-  .event-actions a {
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: none;
-    text-decoration: none;
-  }
-
-  .mark-paid-btn {
-    background-color: var(--success-color);
-    color: white;
-  }
-
-  .mark-paid-btn:hover {
-    background-color: #45a049;
-  }
-
-  .mark-sent-btn {
-    background-color: #fbbf24;
-    color: #78350f;
-    border: 1px solid #f59e0b;
-  }
-
-  .mark-sent-btn:hover {
-    background-color: #f59e0b;
-    color: white;
-  }
-
-  .mark-not-sent-btn {
-    background-color: #fecaca;
-    color: #991b1b;
-    border: 1px solid #f87171;
-  }
-
-  .mark-not-sent-btn:hover {
-    background-color: #f87171;
-    color: white;
-  }
-
-  .invoice-link {
-    background-color: var(--primary-color);
-    color: white;
-    display: inline-flex;
     align-items: center;
+    gap: 0.25rem;
   }
 
-  .invoice-link:hover {
-    background-color: var(--primary-color-darker);
+  .btn-xs {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
   }
 
-  .delete-btn {
-    background-color: transparent;
-    color: #e53e3e;
-    border: 1px solid #e53e3e;
+  .btn-xs.sent {
+    background: var(--color-warning-light);
+    color: #92400e;
   }
 
-  .delete-btn:hover {
-    background-color: #e53e3e;
-    color: white;
+  .btn-xs.sent:hover {
+    background: #fde68a;
   }
 
-  .no-events {
-    text-align: center;
-    padding: 3rem;
-    background-color: var(--surface-color);
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  .btn-xs.paid {
+    background: var(--color-success-light);
+    color: #065f46;
   }
 
-  .no-events p {
-    color: var(--text-secondary-color);
-    margin-bottom: 0.5rem;
+  .btn-xs.paid:hover {
+    background: #a7f3d0;
+  }
+
+  .btn-xs.invoice {
+    background: #ddd6fe;
+    color: #5b21b6;
+  }
+
+  .btn-xs.invoice:hover {
+    background: #c4b5fd;
+  }
+
+  .btn-icon {
+    background: transparent;
+    color: var(--color-text-muted);
+    padding: 0.375rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .btn-icon:hover {
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  .btn-icon.danger:hover {
+    background: var(--color-danger-light);
+    color: var(--color-danger);
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    color: var(--color-text-muted);
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+  }
+
+  .empty-state svg {
+    margin-bottom: 1rem;
+    opacity: 0.4;
+  }
+
+  .empty-state p {
+    margin: 0;
+  }
+
+  .empty-hint {
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
   }
 
   @media (max-width: 768px) {
-    .filters {
+    .filter-row {
       flex-direction: column;
     }
 
-    .event-header {
+    .filter-group select {
+      min-width: 100%;
+    }
+
+    .event-card {
       flex-direction: column;
+      align-items: flex-start;
       gap: 0.75rem;
     }
 
-    .event-meta {
-      align-items: flex-start;
-    }
-
-    .event-actions {
-      flex-direction: column;
-    }
-
-    .event-actions button,
-    .event-actions a {
+    .event-right {
       width: 100%;
-      text-align: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
     }
   }
 </style>

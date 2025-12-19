@@ -6,4 +6,6 @@ qrbill
 svglib
 reportlab
 python-multipart
+httpx
+python-dateutil
 

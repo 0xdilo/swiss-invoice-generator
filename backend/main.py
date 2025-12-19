@@ -78,6 +78,64 @@ def init_db():
             FOREIGN KEY (recurring_fee_id) REFERENCES recurring_fees(id),
             FOREIGN KEY (invoice_id) REFERENCES invoices(id)
         )''')
+
+        c.execute('''CREATE TABLE IF NOT EXISTS partners (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            default_share REAL DEFAULT 50.0,
+            telegram_chat_id TEXT,
+            color TEXT DEFAULT '#4a90e2'
+        )''')
+
+        c.execute('''CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            description TEXT NOT NULL,
+            amount REAL NOT NULL,
+            currency TEXT DEFAULT 'CHF',
+            category TEXT NOT NULL,
+            expense_type TEXT NOT NULL,
+            paid_by INTEGER NOT NULL,
+            split_ratio_a REAL DEFAULT 50.0,
+            split_ratio_b REAL DEFAULT 50.0,
+            receipt_path TEXT,
+            status TEXT DEFAULT 'pending',
+            notes TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (paid_by) REFERENCES partners(id)
+        )''')
+
+        c.execute('''CREATE TABLE IF NOT EXISTS settlements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            from_partner_id INTEGER NOT NULL,
+            to_partner_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            currency TEXT DEFAULT 'CHF',
+            date TEXT NOT NULL,
+            description TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (from_partner_id) REFERENCES partners(id),
+            FOREIGN KEY (to_partner_id) REFERENCES partners(id)
+        )''')
+
+        c.execute('''CREATE TABLE IF NOT EXISTS telegram_config (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            bot_token TEXT,
+            enabled INTEGER DEFAULT 0,
+            notify_renewals_7d INTEGER DEFAULT 1,
+            notify_renewals_14d INTEGER DEFAULT 1,
+            notify_renewals_30d INTEGER DEFAULT 0,
+            notify_overdue INTEGER DEFAULT 1
+        )''')
+
+        c.execute('''CREATE TABLE IF NOT EXISTS notifications_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT NOT NULL,
+            reference_id INTEGER,
+            sent_at TEXT NOT NULL,
+            chat_id TEXT NOT NULL
+        )''')
+
         c.execute("SELECT COUNT(*) FROM bank_details")
         if c.fetchone()[0] == 0:
             c.execute('''INSERT INTO bank_details
@@ -86,22 +144,50 @@ def init_db():
                 ("CH5800791123000889012", "My Bank", "Bankstrasse 1", "POFICHBEXXX",
                  "My Company AG", "My Street 1", "8000", "Zurich", "CH"))
 
-        # Migration: Add invoice_number column if it doesn't exist
+        c.execute("SELECT COUNT(*) FROM partners")
+        if c.fetchone()[0] == 0:
+            c.execute("INSERT INTO partners (name, default_share, color) VALUES (?, ?, ?)", ("Partner A", 50.0, "#4a90e2"))
+            c.execute("INSERT INTO partners (name, default_share, color) VALUES (?, ?, ?)", ("Partner B", 50.0, "#10b981"))
+
+        c.execute("SELECT COUNT(*) FROM telegram_config")
+        if c.fetchone()[0] == 0:
+            c.execute("INSERT INTO telegram_config (id, enabled) VALUES (1, 0)")
+
         c.execute("PRAGMA table_info(invoices)")
         columns = [col[1] for col in c.fetchall()]
         if "invoice_number" not in columns:
             c.execute("ALTER TABLE invoices ADD COLUMN invoice_number TEXT")
-            # Populate invoice_number for existing invoices
             c.execute("SELECT id FROM invoices WHERE invoice_number IS NULL")
             for row in c.fetchall():
                 invoice_id = row[0]
-                # Generate unique invoice number
                 while True:
                     new_invoice_number = generate_invoice_number()
                     c.execute("SELECT COUNT(*) FROM invoices WHERE invoice_number=?", (new_invoice_number,))
                     if c.fetchone()[0] == 0:
                         break
                 c.execute("UPDATE invoices SET invoice_number=? WHERE id=?", (new_invoice_number, invoice_id))
+
+        if "partner_a_share" not in columns:
+            c.execute("ALTER TABLE invoices ADD COLUMN partner_a_share REAL DEFAULT 50.0")
+        if "partner_b_share" not in columns:
+            c.execute("ALTER TABLE invoices ADD COLUMN partner_b_share REAL DEFAULT 50.0")
+        if "status" not in columns:
+            c.execute("ALTER TABLE invoices ADD COLUMN status TEXT DEFAULT 'draft'")
+        if "sent_date" not in columns:
+            c.execute("ALTER TABLE invoices ADD COLUMN sent_date TEXT")
+        if "paid_date" not in columns:
+            c.execute("ALTER TABLE invoices ADD COLUMN paid_date TEXT")
+        if "total_amount" not in columns:
+            c.execute("ALTER TABLE invoices ADD COLUMN total_amount REAL")
+        if "title" not in columns:
+            c.execute("ALTER TABLE invoices ADD COLUMN title TEXT")
+        if "description" not in columns:
+            c.execute("ALTER TABLE invoices ADD COLUMN description TEXT")
+
+        c.execute("PRAGMA table_info(recurring_fees)")
+        rf_columns = [col[1] for col in c.fetchall()]
+        if "service_type" not in rf_columns:
+            c.execute("ALTER TABLE recurring_fees ADD COLUMN service_type TEXT DEFAULT 'other'")
 
         conn.commit()
 
@@ -208,6 +294,37 @@ def delete_client(client_id: int):
         c.execute("DELETE FROM clients WHERE id=?", (client_id,))
         conn.commit()
         return {"ok": True}
+
+@app.get("/clients/{client_id}/stats")
+def get_client_stats(client_id: int):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM invoices WHERE client_id=?", (client_id,))
+        invoices = [dict(zip([col[0] for col in c.description], row)) for row in c.fetchall()]
+
+        total_invoiced = sum(i.get("total_amount", 0) or 0 for i in invoices)
+        paid_invoices = [i for i in invoices if i.get("status") == "paid"]
+        total_paid = sum(i.get("total_amount", 0) or 0 for i in paid_invoices)
+        outstanding_invoices = [i for i in invoices if i.get("status") in ("draft", "sent")]
+        total_outstanding = sum(i.get("total_amount", 0) or 0 for i in outstanding_invoices)
+
+        c.execute("SELECT * FROM recurring_fees WHERE client_id=?", (client_id,))
+        recurring_fees = [dict(zip([col[0] for col in c.description], row)) for row in c.fetchall()]
+        annual_recurring = sum(
+            (f.get("amount", 0) or 0) * (12 if f.get("frequency") == "monthly" else 1)
+            for f in recurring_fees if f.get("frequency") != "one-time"
+        )
+
+        return {
+            "total_invoices": len(invoices),
+            "total_invoiced": total_invoiced,
+            "paid_invoices": len(paid_invoices),
+            "total_paid": total_paid,
+            "outstanding_invoices": len(outstanding_invoices),
+            "total_outstanding": total_outstanding,
+            "recurring_fees": len(recurring_fees),
+            "annual_recurring": annual_recurring
+        }
 
 @app.get("/clients/{client_id}/recurring-fees")
 def get_recurring_fees(client_id: int):
@@ -638,6 +755,111 @@ def delete_template(template_id: int):
         conn.commit()
         return {"ok": True}
 
+@app.get("/templates/{template_id}/content")
+def get_template_content(template_id: int):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT template_dir, html_filename, css_filename FROM templates WHERE id=?", (template_id,))
+        row = c.fetchone()
+        if not row:
+            raise HTTPException(404, "Template not found")
+        template_dir, html_filename, css_filename = row
+        template_path = os.path.join(TEMPLATE_DIR, template_dir)
+
+        html_content = ""
+        css_content = ""
+
+        html_path = os.path.join(template_path, html_filename)
+        if os.path.exists(html_path):
+            with open(html_path, "r", encoding="utf-8") as f:
+                html_content = f.read()
+
+        css_path = os.path.join(template_path, css_filename)
+        if os.path.exists(css_path):
+            with open(css_path, "r", encoding="utf-8") as f:
+                css_content = f.read()
+
+        return {"html": html_content, "css": css_content}
+
+@app.put("/templates/{template_id}/content")
+def update_template_content(template_id: int, content: dict):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT template_dir, html_filename, css_filename FROM templates WHERE id=?", (template_id,))
+        row = c.fetchone()
+        if not row:
+            raise HTTPException(404, "Template not found")
+        template_dir, html_filename, css_filename = row
+        template_path = os.path.join(TEMPLATE_DIR, template_dir)
+
+        if "html" in content:
+            html_path = os.path.join(template_path, html_filename)
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(content["html"])
+            fields = extract_jinja_fields(content["html"])
+            c.execute("UPDATE templates SET fields=? WHERE id=?", (json.dumps(fields), template_id))
+
+        if "css" in content:
+            css_path = os.path.join(template_path, css_filename)
+            with open(css_path, "w", encoding="utf-8") as f:
+                f.write(content["css"])
+
+        conn.commit()
+        return {"ok": True}
+
+@app.post("/templates/{template_id}/preview")
+def preview_template(template_id: int, preview_data: dict = None):
+    from jinja2 import Environment, FileSystemLoader
+
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT template_dir, html_filename, css_filename FROM templates WHERE id=?", (template_id,))
+        row = c.fetchone()
+        if not row:
+            raise HTTPException(404, "Template not found")
+        template_dir, html_filename, css_filename = row
+        template_path = os.path.join(TEMPLATE_DIR, template_dir)
+
+        css_path = os.path.join(template_path, css_filename)
+        css_content = ""
+        if os.path.exists(css_path):
+            with open(css_path, "r", encoding="utf-8") as f:
+                css_content = f.read()
+
+        sample_data = preview_data or {
+            "invoice_number": "INV-2024-001",
+            "date": "2024-12-19",
+            "client": {
+                "name": "Sample Client",
+                "address": "123 Example Street",
+                "cap": "8000",
+                "city": "Zurich",
+                "nation": "CH",
+                "email": "client@example.com"
+            },
+            "items": [
+                {"desc": "Web Development", "price": 1500, "qty": 1},
+                {"desc": "Hosting (annual)", "price": 300, "qty": 1}
+            ],
+            "subtotal": 1800,
+            "total": 1800,
+            "qr_image": ""
+        }
+
+        env = Environment(loader=FileSystemLoader(template_path))
+        template = env.get_template(html_filename)
+        rendered_html = template.render(**sample_data)
+
+        full_html = f"""<!DOCTYPE html>
+<html>
+<head>
+<style>{css_content}</style>
+</head>
+<body>{rendered_html}</body>
+</html>"""
+
+        return {"html": full_html}
+
 @app.get("/templates/{template_id}/fields")
 def get_template_fields(template_id: int):
     with db() as conn:
@@ -649,10 +871,13 @@ def get_template_fields(template_id: int):
         return {"fields": json.loads(row[0])}
 
 @app.get("/invoices")
-def get_invoices():
+def get_invoices(client_id: int = None):
     with db() as conn:
         c = conn.cursor()
-        c.execute("SELECT * FROM invoices")
+        if client_id:
+            c.execute("SELECT * FROM invoices WHERE client_id=?", (client_id,))
+        else:
+            c.execute("SELECT * FROM invoices")
         rows = c.fetchall()
         return [dict(zip([col[0] for col in c.description], row)) for row in rows]
 
@@ -671,25 +896,33 @@ async def create_invoice(
     client_id: int = Form(...),
     template_id: int = Form(...),
     data: str = Form(...),
-    logo_file: UploadFile = File(None)
+    logo_file: UploadFile = File(None),
+    partner_a_share: float = Form(50.0),
+    partner_b_share: float = Form(50.0),
+    title: str = Form(""),
+    description: str = Form("")
 ):
     RESULTS_DIR = "results"
     os.makedirs(RESULTS_DIR, exist_ok=True)
-    
+
     with db() as conn:
         c = conn.cursor()
-        # Generate unique invoice number
         while True:
             invoice_number = generate_invoice_number()
             c.execute("SELECT COUNT(*) FROM invoices WHERE invoice_number=?", (invoice_number,))
             if c.fetchone()[0] == 0:
                 break
-        c.execute("INSERT INTO invoices (invoice_number, client_id, template_id, data) VALUES (?, ?, ?, ?)",
-                  (invoice_number, client_id, template_id, data))
+
+        invoice_data = json.loads(data)
+        items = invoice_data.get("items", [])
+        total_amount = sum(float(item.get("price", 0)) * float(item.get("qty", 1)) for item in items)
+
+        c.execute("""INSERT INTO invoices (invoice_number, client_id, template_id, data, partner_a_share, partner_b_share, status, total_amount, title, description)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                  (invoice_number, client_id, template_id, data, partner_a_share, partner_b_share, "draft", total_amount, title, description))
         conn.commit()
         invoice_id = c.lastrowid
 
-        # Auto-link to the first available payment event (not_sent or sent) for this client
         from datetime import datetime
         c.execute(
             "SELECT id FROM payment_events WHERE client_id=? AND status IN ('not_sent', 'sent') ORDER BY due_date ASC LIMIT 1",
@@ -713,17 +946,14 @@ async def create_invoice(
         c.execute("SELECT * FROM clients WHERE id=?", (client_id,))
         client_row = c.fetchone()
         client_dict = dict(zip([col[0] for col in c.description], client_row))
-        
-        client_dict["zip"] = client_dict["cap"]  
+
+        client_dict["zip"] = client_dict["cap"]
         client_dict["formatted_city"] = f"{client_dict['city']}, {client_dict['cap']}"
         client_dict["country"] = client_dict.get("nation") or "CH"
 
         c.execute("SELECT * FROM bank_details LIMIT 1")
         bank_row = c.fetchone()
         bank_details = dict(zip([col[0] for col in c.description], bank_row))
-
-        invoice_data = json.loads(data)
-        items = invoice_data.get("items", [])
 
         for item in items:
             item["total"] = float(item["price"]) * float(item["qty"])
@@ -827,28 +1057,34 @@ async def create_invoice(
 
 @app.put("/invoices/{invoice_id}")
 async def update_invoice(
-    invoice_id: int, 
+    invoice_id: int,
     client_id: int = Form(...),
     template_id: int = Form(...),
     data: str = Form(...),
-    logo_file: UploadFile = File(None)
+    logo_file: UploadFile = File(None),
+    partner_a_share: float = Form(50.0),
+    partner_b_share: float = Form(50.0),
+    title: str = Form(""),
+    description: str = Form("")
 ):
     RESULTS_DIR = "results"
     os.makedirs(RESULTS_DIR, exist_ok=True)
-    
+
     with db() as conn:
         c = conn.cursor()
 
-        # Get existing invoice_number
         c.execute("SELECT invoice_number FROM invoices WHERE id=?", (invoice_id,))
         existing = c.fetchone()
         if not existing:
             raise HTTPException(404, "Invoice not found")
         invoice_number = existing[0]
 
-        # Update the invoice record
-        c.execute("UPDATE invoices SET client_id=?, template_id=?, data=? WHERE id=?",
-                  (client_id, template_id, data, invoice_id))
+        invoice_data_parsed = json.loads(data)
+        items = invoice_data_parsed.get("items", [])
+        total_amount = sum(float(item.get("price", 0)) * float(item.get("qty", 1)) for item in items)
+
+        c.execute("""UPDATE invoices SET client_id=?, template_id=?, data=?, partner_a_share=?, partner_b_share=?, total_amount=?, title=?, description=? WHERE id=?""",
+                  (client_id, template_id, data, partner_a_share, partner_b_share, total_amount, title, description, invoice_id))
         conn.commit()
 
         # Get template info
@@ -1011,4 +1247,517 @@ def get_invoice_pdf(invoice_id: int):
     if not os.path.exists(pdf_path):
         raise HTTPException(404, "PDF not found")
     return FileResponse(pdf_path, media_type="application/pdf")
+
+@app.put("/invoices/{invoice_id}/status")
+def update_invoice_status(invoice_id: int, data: dict = Body(...)):
+    from datetime import datetime
+    with db() as conn:
+        c = conn.cursor()
+        status = data.get("status")
+        if status not in ["draft", "sent", "paid"]:
+            raise HTTPException(400, "Invalid status")
+
+        updates = ["status=?"]
+        params = [status]
+
+        if status == "sent":
+            updates.append("sent_date=?")
+            params.append(data.get("sent_date") or datetime.now().strftime("%Y-%m-%d"))
+        elif status == "paid":
+            updates.append("paid_date=?")
+            params.append(data.get("paid_date") or datetime.now().strftime("%Y-%m-%d"))
+
+        params.append(invoice_id)
+        c.execute(f"UPDATE invoices SET {', '.join(updates)} WHERE id=?", params)
+        conn.commit()
+        return {"ok": True}
+
+@app.get("/partners")
+def get_partners():
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM partners")
+        rows = c.fetchall()
+        return [dict(zip([col[0] for col in c.description], row)) for row in rows]
+
+@app.put("/partners/{partner_id}")
+def update_partner(partner_id: int, partner: dict = Body(...)):
+    with db() as conn:
+        c = conn.cursor()
+        updates = []
+        params = []
+        if "name" in partner:
+            updates.append("name=?")
+            params.append(partner["name"])
+        if "default_share" in partner:
+            updates.append("default_share=?")
+            params.append(partner["default_share"])
+        if "telegram_chat_id" in partner:
+            updates.append("telegram_chat_id=?")
+            params.append(partner["telegram_chat_id"])
+        if "color" in partner:
+            updates.append("color=?")
+            params.append(partner["color"])
+        if not updates:
+            return {"ok": True}
+        params.append(partner_id)
+        c.execute(f"UPDATE partners SET {', '.join(updates)} WHERE id=?", params)
+        conn.commit()
+        return {"ok": True}
+
+@app.get("/expenses")
+def get_expenses(category: str = None, expense_type: str = None, status: str = None, date_from: str = None, date_to: str = None):
+    with db() as conn:
+        c = conn.cursor()
+        query = "SELECT * FROM expenses"
+        conditions = []
+        params = []
+        if category:
+            conditions.append("category=?")
+            params.append(category)
+        if expense_type:
+            conditions.append("expense_type=?")
+            params.append(expense_type)
+        if status:
+            conditions.append("status=?")
+            params.append(status)
+        if date_from:
+            conditions.append("date>=?")
+            params.append(date_from)
+        if date_to:
+            conditions.append("date<=?")
+            params.append(date_to)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY date DESC"
+        c.execute(query, params)
+        rows = c.fetchall()
+        expenses = [dict(zip([col[0] for col in c.description], row)) for row in rows]
+        for exp in expenses:
+            c.execute("SELECT name FROM partners WHERE id=?", (exp["paid_by"],))
+            partner = c.fetchone()
+            exp["paid_by_name"] = partner[0] if partner else "Unknown"
+        return expenses
+
+@app.post("/expenses")
+def create_expense(expense: dict = Body(...)):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute(
+            """INSERT INTO expenses (date, description, amount, currency, category, expense_type, paid_by, split_ratio_a, split_ratio_b, receipt_path, notes)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (expense["date"], expense["description"], expense["amount"], expense.get("currency", "CHF"),
+             expense["category"], expense["expense_type"], expense["paid_by"],
+             expense.get("split_ratio_a", 50.0), expense.get("split_ratio_b", 50.0),
+             expense.get("receipt_path"), expense.get("notes"))
+        )
+        conn.commit()
+        return {"id": c.lastrowid}
+
+@app.put("/expenses/{expense_id}")
+def update_expense(expense_id: int, expense: dict = Body(...)):
+    with db() as conn:
+        c = conn.cursor()
+        updates = []
+        params = []
+        for field in ["date", "description", "amount", "currency", "category", "expense_type", "paid_by", "split_ratio_a", "split_ratio_b", "receipt_path", "status", "notes"]:
+            if field in expense:
+                updates.append(f"{field}=?")
+                params.append(expense[field])
+        if not updates:
+            return {"ok": True}
+        params.append(expense_id)
+        c.execute(f"UPDATE expenses SET {', '.join(updates)} WHERE id=?", params)
+        conn.commit()
+        return {"ok": True}
+
+@app.delete("/expenses/{expense_id}")
+def delete_expense(expense_id: int):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM expenses WHERE id=?", (expense_id,))
+        conn.commit()
+        return {"ok": True}
+
+@app.get("/expenses/balance")
+def get_expense_balance():
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT id FROM partners ORDER BY id")
+        partners = [row[0] for row in c.fetchall()]
+        if len(partners) < 2:
+            return {"balance": 0, "owes_to": None, "owes_from": None}
+        partner_a, partner_b = partners[0], partners[1]
+
+        c.execute("SELECT * FROM expenses WHERE status='pending'")
+        expenses = [dict(zip([col[0] for col in c.description], row)) for row in c.fetchall()]
+
+        a_owes_b = 0.0
+        b_owes_a = 0.0
+
+        for exp in expenses:
+            amount = exp["amount"]
+            split_a = exp["split_ratio_a"] / 100.0
+            split_b = exp["split_ratio_b"] / 100.0
+            paid_by = exp["paid_by"]
+
+            a_share = amount * split_a
+            b_share = amount * split_b
+
+            if paid_by == partner_a:
+                b_owes_a += b_share
+            else:
+                a_owes_b += a_share
+
+        net_balance = b_owes_a - a_owes_b
+
+        c.execute("SELECT name FROM partners WHERE id=?", (partner_a,))
+        name_a = c.fetchone()[0]
+        c.execute("SELECT name FROM partners WHERE id=?", (partner_b,))
+        name_b = c.fetchone()[0]
+
+        if net_balance > 0:
+            return {"balance": abs(net_balance), "owes_from": name_b, "owes_to": name_a, "owes_from_id": partner_b, "owes_to_id": partner_a}
+        elif net_balance < 0:
+            return {"balance": abs(net_balance), "owes_from": name_a, "owes_to": name_b, "owes_from_id": partner_a, "owes_to_id": partner_b}
+        else:
+            return {"balance": 0, "owes_from": None, "owes_to": None}
+
+@app.get("/settlements")
+def get_settlements():
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM settlements ORDER BY date DESC")
+        rows = c.fetchall()
+        settlements = [dict(zip([col[0] for col in c.description], row)) for row in rows]
+        for s in settlements:
+            c.execute("SELECT name FROM partners WHERE id=?", (s["from_partner_id"],))
+            s["from_partner_name"] = c.fetchone()[0]
+            c.execute("SELECT name FROM partners WHERE id=?", (s["to_partner_id"],))
+            s["to_partner_name"] = c.fetchone()[0]
+        return settlements
+
+@app.post("/settlements")
+def create_settlement(settlement: dict = Body(...)):
+    from datetime import datetime
+    with db() as conn:
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO settlements (from_partner_id, to_partner_id, amount, currency, date, description) VALUES (?, ?, ?, ?, ?, ?)",
+            (settlement["from_partner_id"], settlement["to_partner_id"], settlement["amount"],
+             settlement.get("currency", "CHF"), settlement.get("date") or datetime.now().strftime("%Y-%m-%d"),
+             settlement.get("description", ""))
+        )
+        if settlement.get("settle_pending", True):
+            c.execute("UPDATE expenses SET status='settled' WHERE status='pending'")
+        conn.commit()
+        return {"id": c.lastrowid}
+
+@app.get("/dashboard/stats")
+def get_dashboard_stats(period: str = "all"):
+    from datetime import datetime, timedelta
+    with db() as conn:
+        c = conn.cursor()
+
+        date_filter = ""
+        if period == "month":
+            start = datetime.now().replace(day=1).strftime("%Y-%m-%d")
+            date_filter = f" AND i.paid_date >= '{start}'"
+        elif period == "year":
+            start = datetime.now().replace(month=1, day=1).strftime("%Y-%m-%d")
+            date_filter = f" AND i.paid_date >= '{start}'"
+
+        c.execute(f"""
+            SELECT COALESCE(SUM(total_amount), 0) as total_revenue,
+                   COALESCE(SUM(total_amount * partner_a_share / 100.0), 0) as partner_a_revenue,
+                   COALESCE(SUM(total_amount * partner_b_share / 100.0), 0) as partner_b_revenue
+            FROM invoices i WHERE status = 'paid' {date_filter}
+        """)
+        revenue = c.fetchone()
+
+        c.execute("SELECT COALESCE(SUM(total_amount), 0) FROM invoices WHERE status IN ('draft', 'sent')")
+        outstanding = c.fetchone()[0]
+
+        expense_date_filter = ""
+        if period == "month":
+            expense_date_filter = f" AND date >= '{start}'"
+        elif period == "year":
+            expense_date_filter = f" AND date >= '{start}'"
+
+        c.execute(f"SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE 1=1 {expense_date_filter}")
+        total_expenses = c.fetchone()[0]
+
+        c.execute("SELECT COUNT(*) FROM invoices WHERE status='draft'")
+        draft_count = c.fetchone()[0]
+
+        c.execute("SELECT COUNT(*) FROM invoices WHERE status='sent'")
+        sent_count = c.fetchone()[0]
+
+        c.execute("SELECT COUNT(*) FROM invoices WHERE status='paid'")
+        paid_count = c.fetchone()[0]
+
+        return {
+            "total_revenue": revenue[0] or 0,
+            "partner_a_revenue": revenue[1] or 0,
+            "partner_b_revenue": revenue[2] or 0,
+            "outstanding": outstanding or 0,
+            "total_expenses": total_expenses or 0,
+            "net_profit": (revenue[0] or 0) - (total_expenses or 0),
+            "invoice_counts": {"draft": draft_count, "sent": sent_count, "paid": paid_count}
+        }
+
+@app.get("/dashboard/renewals")
+def get_dashboard_renewals(days: int = 30):
+    from datetime import datetime, timedelta
+    with db() as conn:
+        c = conn.cursor()
+        today = datetime.now().date()
+        end_date = today + timedelta(days=days)
+
+        c.execute("""
+            SELECT pe.*, c.name as client_name, rf.service_type
+            FROM payment_events pe
+            LEFT JOIN clients c ON pe.client_id = c.id
+            LEFT JOIN recurring_fees rf ON pe.recurring_fee_id = rf.id
+            WHERE pe.status != 'paid'
+            AND pe.due_date >= ? AND pe.due_date <= ?
+            ORDER BY pe.due_date ASC
+        """, (today.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")))
+        rows = c.fetchall()
+        renewals = [dict(zip([col[0] for col in c.description], row)) for row in rows]
+
+        for r in renewals:
+            due = datetime.strptime(r["due_date"], "%Y-%m-%d").date()
+            r["days_until"] = (due - today).days
+            if r["days_until"] <= 7:
+                r["urgency"] = "critical"
+            elif r["days_until"] <= 14:
+                r["urgency"] = "warning"
+            else:
+                r["urgency"] = "normal"
+        return renewals
+
+@app.get("/dashboard/outstanding")
+def get_dashboard_outstanding():
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("""
+            SELECT i.*, c.name as client_name
+            FROM invoices i
+            LEFT JOIN clients c ON i.client_id = c.id
+            WHERE i.status IN ('draft', 'sent')
+            ORDER BY i.status DESC, i.id DESC
+        """)
+        rows = c.fetchall()
+        return [dict(zip([col[0] for col in c.description], row)) for row in rows]
+
+@app.get("/dashboard/partner-earnings")
+def get_partner_earnings(period: str = "all"):
+    from datetime import datetime
+    with db() as conn:
+        c = conn.cursor()
+
+        date_filter = ""
+        if period == "month":
+            start = datetime.now().replace(day=1).strftime("%Y-%m-%d")
+            date_filter = f" AND paid_date >= '{start}'"
+        elif period == "year":
+            start = datetime.now().replace(month=1, day=1).strftime("%Y-%m-%d")
+            date_filter = f" AND paid_date >= '{start}'"
+
+        c.execute(f"""
+            SELECT
+                COALESCE(SUM(total_amount * partner_a_share / 100.0), 0) as partner_a,
+                COALESCE(SUM(total_amount * partner_b_share / 100.0), 0) as partner_b
+            FROM invoices WHERE status = 'paid' {date_filter}
+        """)
+        earnings = c.fetchone()
+
+        c.execute("SELECT id, name, color FROM partners ORDER BY id")
+        partners = [dict(zip(["id", "name", "color"], row)) for row in c.fetchall()]
+
+        if len(partners) >= 2:
+            partners[0]["earnings"] = earnings[0] or 0
+            partners[1]["earnings"] = earnings[1] or 0
+
+        return {"partners": partners, "period": period}
+
+@app.get("/telegram/config")
+def get_telegram_config():
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM telegram_config WHERE id=1")
+        row = c.fetchone()
+        if row:
+            return dict(zip([col[0] for col in c.description], row))
+        return {}
+
+@app.put("/telegram/config")
+def update_telegram_config(config: dict = Body(...)):
+    with db() as conn:
+        c = conn.cursor()
+        updates = []
+        params = []
+        for field in ["bot_token", "enabled", "notify_renewals_7d", "notify_renewals_14d", "notify_renewals_30d", "notify_overdue"]:
+            if field in config:
+                updates.append(f"{field}=?")
+                params.append(config[field])
+        if not updates:
+            return {"ok": True}
+        c.execute(f"UPDATE telegram_config SET {', '.join(updates)} WHERE id=1", params)
+        conn.commit()
+        return {"ok": True}
+
+@app.post("/telegram/test")
+async def test_telegram():
+    import httpx
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT bot_token FROM telegram_config WHERE id=1")
+        row = c.fetchone()
+        if not row or not row[0]:
+            raise HTTPException(400, "Telegram bot token not configured")
+        bot_token = row[0]
+
+        c.execute("SELECT telegram_chat_id FROM partners WHERE telegram_chat_id IS NOT NULL")
+        chat_ids = [r[0] for r in c.fetchall() if r[0]]
+        if not chat_ids:
+            raise HTTPException(400, "No Telegram chat IDs configured for partners")
+
+        async with httpx.AsyncClient() as client:
+            for chat_id in chat_ids:
+                await client.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={"chat_id": chat_id, "text": "Test notification from Invoice Manager", "parse_mode": "HTML"}
+                )
+        return {"ok": True, "sent_to": len(chat_ids)}
+
+@app.post("/telegram/check")
+async def check_and_send_notifications():
+    import httpx
+    from datetime import datetime, timedelta
+
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM telegram_config WHERE id=1")
+        config_row = c.fetchone()
+        if not config_row:
+            return {"sent": 0}
+        config = dict(zip([col[0] for col in c.description], config_row))
+
+        if not config.get("enabled") or not config.get("bot_token"):
+            return {"sent": 0}
+
+        bot_token = config["bot_token"]
+        c.execute("SELECT telegram_chat_id FROM partners WHERE telegram_chat_id IS NOT NULL")
+        chat_ids = [r[0] for r in c.fetchall() if r[0]]
+        if not chat_ids:
+            return {"sent": 0}
+
+        today = datetime.now().date()
+        sent_count = 0
+
+        async def send_message(chat_id, text, ref_type, ref_id):
+            nonlocal sent_count
+            c.execute("SELECT COUNT(*) FROM notifications_log WHERE type=? AND reference_id=? AND DATE(sent_at)=?",
+                     (ref_type, ref_id, today.strftime("%Y-%m-%d")))
+            if c.fetchone()[0] > 0:
+                return
+            async with httpx.AsyncClient() as client:
+                await client.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+                )
+            c.execute("INSERT INTO notifications_log (type, reference_id, sent_at, chat_id) VALUES (?, ?, ?, ?)",
+                     (ref_type, ref_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), chat_id))
+            sent_count += 1
+
+        for days, config_key in [(7, "notify_renewals_7d"), (14, "notify_renewals_14d"), (30, "notify_renewals_30d")]:
+            if config.get(config_key):
+                target_date = today + timedelta(days=days)
+                c.execute("""
+                    SELECT pe.id, pe.description, pe.amount, pe.currency, pe.due_date, c.name as client_name
+                    FROM payment_events pe
+                    LEFT JOIN clients c ON pe.client_id = c.id
+                    WHERE pe.status != 'paid' AND pe.due_date = ?
+                """, (target_date.strftime("%Y-%m-%d"),))
+                for row in c.fetchall():
+                    pe = dict(zip(["id", "description", "amount", "currency", "due_date", "client_name"], row))
+                    msg = f"Renewal in {days} days:\n{pe['client_name']} - {pe['description']}\n{pe['amount']} {pe['currency']} (due: {pe['due_date']})"
+                    for chat_id in chat_ids:
+                        await send_message(chat_id, msg, f"renewal_{days}d", pe["id"])
+
+        if config.get("notify_overdue"):
+            c.execute("""
+                SELECT pe.id, pe.description, pe.amount, pe.currency, pe.due_date, c.name as client_name
+                FROM payment_events pe
+                LEFT JOIN clients c ON pe.client_id = c.id
+                WHERE pe.status != 'paid' AND pe.due_date < ?
+            """, (today.strftime("%Y-%m-%d"),))
+            for row in c.fetchall():
+                pe = dict(zip(["id", "description", "amount", "currency", "due_date", "client_name"], row))
+                msg = f"OVERDUE: {pe['client_name']} - {pe['description']}\n{pe['amount']} {pe['currency']} (was due: {pe['due_date']})"
+                for chat_id in chat_ids:
+                    await send_message(chat_id, msg, "overdue", pe["id"])
+
+        conn.commit()
+        return {"sent": sent_count}
+
+@app.post("/recurring-fees/{fee_id}/generate-invoice")
+def generate_invoice_from_recurring(fee_id: int):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM recurring_fees WHERE id=?", (fee_id,))
+        fee_row = c.fetchone()
+        if not fee_row:
+            raise HTTPException(404, "Recurring fee not found")
+        fee = dict(zip([col[0] for col in c.description], fee_row))
+
+        c.execute("SELECT id FROM templates LIMIT 1")
+        template_row = c.fetchone()
+        if not template_row:
+            raise HTTPException(400, "No templates available")
+        template_id = template_row[0]
+
+        c.execute("SELECT id FROM partners ORDER BY id LIMIT 2")
+        partners = c.fetchall()
+        partner_a_share = 50.0
+        partner_b_share = 50.0
+        if len(partners) >= 2:
+            c.execute("SELECT default_share FROM partners WHERE id=?", (partners[0][0],))
+            partner_a_share = c.fetchone()[0]
+            partner_b_share = 100.0 - partner_a_share
+
+        from datetime import datetime
+        invoice_data = json.dumps({
+            "items": [{"desc": fee["description"] or "Service", "price": fee["amount"], "qty": 1}],
+            "date": datetime.now().strftime("%d.%m.%Y"),
+            "notes": ""
+        })
+
+        while True:
+            invoice_number = generate_invoice_number()
+            c.execute("SELECT COUNT(*) FROM invoices WHERE invoice_number=?", (invoice_number,))
+            if c.fetchone()[0] == 0:
+                break
+
+        total = fee["amount"]
+        c.execute(
+            """INSERT INTO invoices (invoice_number, client_id, template_id, data, partner_a_share, partner_b_share, status, total_amount)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (invoice_number, fee["client_id"], template_id, invoice_data, partner_a_share, partner_b_share, "draft", total)
+        )
+        invoice_id = c.lastrowid
+
+        c.execute("""
+            SELECT id FROM payment_events
+            WHERE recurring_fee_id=? AND status IN ('not_sent', 'sent')
+            ORDER BY due_date ASC LIMIT 1
+        """, (fee_id,))
+        pe_row = c.fetchone()
+        if pe_row:
+            c.execute("UPDATE payment_events SET invoice_id=? WHERE id=?", (invoice_id, pe_row[0]))
+
+        conn.commit()
+        return {"invoice_id": invoice_id, "invoice_number": invoice_number}
 
