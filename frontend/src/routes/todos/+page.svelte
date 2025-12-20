@@ -28,9 +28,6 @@
     return true;
   });
 
-  $: pendingTodos = filteredTodos.filter(t => t.status === "pending");
-  $: completedTodos = filteredTodos.filter(t => t.status === "completed");
-
   $: stats = {
     total: todos.length,
     pending: todos.filter(t => t.status === "pending").length,
@@ -126,109 +123,158 @@
   }
 </script>
 
-<div class="page">
-  <header class="page-header">
-    <div class="header-content">
-      <div class="title-block">
-        <h1>Tasks</h1>
-        <div class="stats-inline">
-          <span class="stat">{stats.pending} pending</span>
+<div class="max-w-3xl mx-auto animate-fade-in">
+  <header class="mb-8">
+    <div class="flex justify-between items-start gap-4">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight mb-2">Tasks</h1>
+        <div class="flex gap-4 text-sm text-text-muted">
+          <span>{stats.pending} pending</span>
           {#if stats.high > 0}
-            <span class="stat urgent">{stats.high} urgent</span>
+            <span class="text-red-600 font-medium">{stats.high} urgent</span>
           {/if}
           {#if stats.overdue > 0}
-            <span class="stat overdue">{stats.overdue} overdue</span>
+            <span class="text-red-600">{stats.overdue} overdue</span>
           {/if}
         </div>
       </div>
-      <button class="btn-add" onclick={() => showForm = true}>
-        <span class="btn-add-icon">+</span>
-        <span class="btn-add-text">New Task</span>
+      <button
+        class="flex items-center gap-2.5 bg-text text-surface px-5 py-3 rounded-xl font-semibold text-sm
+               shadow-md hover:-translate-y-px hover:shadow-lg transition-all duration-200"
+        onclick={() => showForm = true}
+      >
+        <span class="text-lg font-normal">+</span>
+        <span class="max-sm:hidden">New Task</span>
       </button>
     </div>
   </header>
 
-  <div class="filters-bar">
-    <div class="filter-tabs">
-      <button class:active={filter === "all"} onclick={() => filter = "all"}>
+  <div class="mb-6 border-b border-border-light">
+    <div class="flex">
+      <button
+        class="relative bg-transparent px-0 py-3 mr-8 font-medium text-[15px] flex items-center gap-2 rounded-none transition-colors
+               {filter === 'all' ? 'text-text' : 'text-text-secondary hover:text-text'}"
+        onclick={() => filter = "all"}
+      >
         Active
-        <span class="count">{todos.filter(t => t.status !== "completed").length}</span>
+        <span class="text-xs px-2 py-0.5 rounded-full {filter === 'all' ? 'bg-text text-surface' : 'bg-border-light text-text-secondary'}">
+          {todos.filter(t => t.status !== "completed").length}
+        </span>
+        {#if filter === 'all'}
+          <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-text"></span>
+        {/if}
       </button>
-      <button class:active={filter === "completed"} onclick={() => filter = "completed"}>
+      <button
+        class="relative bg-transparent px-0 py-3 mr-8 font-medium text-[15px] flex items-center gap-2 rounded-none transition-colors
+               {filter === 'completed' ? 'text-text' : 'text-text-secondary hover:text-text'}"
+        onclick={() => filter = "completed"}
+      >
         Done
-        <span class="count">{stats.completed}</span>
+        <span class="text-xs px-2 py-0.5 rounded-full {filter === 'completed' ? 'bg-text text-surface' : 'bg-border-light text-text-secondary'}">
+          {stats.completed}
+        </span>
+        {#if filter === 'completed'}
+          <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-text"></span>
+        {/if}
       </button>
     </div>
   </div>
 
-  <main class="content">
+  <main class="min-h-[300px]">
     {#if filteredTodos.length === 0}
-      <div class="empty-state">
-        <div class="empty-icon">
+      <div class="text-center py-16 px-8">
+        <div class="w-16 h-16 mx-auto mb-6 bg-bg rounded-2xl flex items-center justify-center text-text-muted">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M9 11l3 3L22 4"/>
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
           </svg>
         </div>
-        <p class="empty-title">{filter === "completed" ? "No completed tasks yet" : "All clear"}</p>
-        <p class="empty-subtitle">{filter === "completed" ? "Complete some tasks to see them here" : "Add a task to get started"}</p>
+        <p class="text-lg font-semibold mb-2">{filter === "completed" ? "No completed tasks yet" : "All clear"}</p>
+        <p class="text-text-secondary">{filter === "completed" ? "Complete some tasks to see them here" : "Add a task to get started"}</p>
       </div>
     {:else}
-      <ul class="task-list">
+      <ul class="flex flex-col gap-0.5">
         {#each filteredTodos as todo, i (todo.id)}
           {@const daysUntil = getDaysUntil(todo.due_date)}
           <li
-            class="task-item"
-            class:completing={completingId === todo.id}
-            class:completed={todo.status === "completed"}
-            class:overdue={isOverdue(todo)}
-            class:due-soon={isDueSoon(todo)}
-            class:high={todo.priority === "high"}
-            style="--delay: {i * 0.03}s"
+            class="group flex items-start gap-4 p-4 bg-surface rounded-xl transition-all duration-200 animate-slide-in relative
+                   hover:shadow-md
+                   {completingId === todo.id ? 'scale-[1.02] bg-green-50' : ''}
+                   {todo.status === 'completed' ? 'opacity-55' : ''}"
+            style="animation-delay: {i * 0.03}s"
           >
+            {#if todo.priority === 'high' && todo.status !== 'completed'}
+              <span class="absolute left-0 top-0 bottom-0 w-[3px] bg-red-600 rounded-l-xl"></span>
+            {/if}
+            {#if isOverdue(todo)}
+              <span class="absolute left-0 top-0 bottom-0 w-[3px] bg-red-600 rounded-l-xl"></span>
+            {/if}
+
             <button
-              class="checkbox"
+              class="relative w-[22px] h-[22px] border-2 rounded-md bg-transparent flex-shrink-0 mt-0.5
+                     flex items-center justify-center transition-all duration-200
+                     {todo.status === 'completed'
+                       ? 'bg-success border-success'
+                       : 'border-border hover:border-primary hover:bg-primary-light'}"
               onclick={() => toggleComplete(todo)}
-              aria-label={todo.status === "completed" ? "Mark as incomplete" : "Mark as complete"}
             >
-              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <svg
+                class="w-3 h-3 transition-all duration-200
+                       {todo.status === 'completed' ? 'opacity-100 scale-100 stroke-white' : 'opacity-0 scale-50 stroke-primary'}"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+              >
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
-              <div class="check-ring"></div>
             </button>
 
-            <div class="task-body">
-              <div class="task-main">
-                <span class="task-title">{todo.title}</span>
-                {#if todo.priority === "high"}
-                  <span class="priority-indicator" title="High priority"></span>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="font-medium text-[15px] {todo.status === 'completed' ? 'line-through text-text-secondary' : 'text-text'}">
+                  {todo.title}
+                </span>
+                {#if todo.priority === "high" && todo.status !== 'completed'}
+                  <span class="w-1.5 h-1.5 bg-red-600 rounded-full flex-shrink-0"></span>
                 {/if}
               </div>
 
               {#if todo.description}
-                <p class="task-desc">{todo.description}</p>
+                <p class="text-sm text-text-secondary leading-relaxed mb-2">{todo.description}</p>
               {/if}
 
-              <div class="task-meta">
+              <div class="flex gap-2 flex-wrap">
                 {#if todo.due_date}
-                  <span class="meta-tag" class:overdue={isOverdue(todo)} class:today={daysUntil === 0} class:soon={isDueSoon(todo) && !isOverdue(todo)}>
+                  <span class="text-xs px-2.5 py-1 rounded font-medium
+                               {isOverdue(todo) ? 'bg-red-100 text-red-600' :
+                                daysUntil === 0 ? 'bg-blue-100 text-blue-700' :
+                                isDueSoon(todo) ? 'bg-amber-100 text-amber-700' :
+                                'bg-bg text-text-secondary'}">
                     {formatDate(todo.due_date)}
                   </span>
                 {/if}
                 {#if todo.client_name}
-                  <span class="meta-tag client">{todo.client_name}</span>
+                  <span class="text-xs px-2.5 py-1 rounded border border-border text-text-muted">
+                    {todo.client_name}
+                  </span>
                 {/if}
               </div>
             </div>
 
-            <div class="task-actions">
-              <button class="action-btn" onclick={() => editTodo(todo)} aria-label="Edit task">
+            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity max-sm:opacity-100">
+              <button
+                class="w-8 h-8 bg-transparent text-text-muted rounded-md flex items-center justify-center
+                       hover:bg-bg hover:text-text transition-all"
+                onclick={() => editTodo(todo)}
+              >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                 </svg>
               </button>
-              <button class="action-btn delete" onclick={() => handleDelete(todo.id)} aria-label="Delete task">
+              <button
+                class="w-8 h-8 bg-transparent text-text-muted rounded-md flex items-center justify-center
+                       hover:bg-red-100 hover:text-red-600 transition-all"
+                onclick={() => handleDelete(todo.id)}
+              >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3 6 5 6 21 6"/>
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -243,11 +289,21 @@
 </div>
 
 {#if showForm}
-  <div class="modal-backdrop" onclick={resetForm} role="button" tabindex="-1" onkeydown={(e) => e.key === 'Escape' && resetForm()}>
-    <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+  <div
+    class="modal-backdrop"
+    onclick={resetForm}
+    role="button"
+    tabindex="-1"
+    onkeydown={(e) => e.key === 'Escape' && resetForm()}
+  >
+    <div class="modal max-w-md" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
       <header class="modal-header">
-        <h2>{editingTodo ? "Edit Task" : "New Task"}</h2>
-        <button class="modal-close" onclick={resetForm} aria-label="Close">
+        <h2 class="text-lg font-semibold">{editingTodo ? "Edit Task" : "New Task"}</h2>
+        <button
+          class="w-8 h-8 bg-transparent text-text-muted rounded-lg flex items-center justify-center
+                 hover:bg-bg hover:text-text transition-all"
+          onclick={resetForm}
+        >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -256,41 +312,43 @@
       </header>
 
       <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-        <div class="form-body">
-          <div class="form-field">
+        <div class="modal-body">
+          <div class="mb-4">
             <input
-              id="title"
               type="text"
               bind:value={form.title}
               required
               placeholder="What needs to be done?"
-              class="input-title"
+              class="form-input text-lg font-medium py-3.5"
             />
           </div>
 
-          <div class="form-field">
+          <div class="mb-4">
             <textarea
-              id="description"
               bind:value={form.description}
               placeholder="Add notes..."
               rows="3"
+              class="form-input resize-none"
             ></textarea>
           </div>
 
-          <div class="form-row-compact">
-            <div class="form-field">
-              <label for="due_date">Due date</label>
-              <input id="due_date" type="date" bind:value={form.due_date} />
+          <div class="grid grid-cols-2 gap-4 mb-4 max-sm:grid-cols-1">
+            <div>
+              <label class="form-label">Due date</label>
+              <input type="date" bind:value={form.due_date} class="form-input" />
             </div>
 
-            <div class="form-field">
-              <label for="priority">Priority</label>
-              <div class="priority-select">
+            <div>
+              <label class="form-label">Priority</label>
+              <div class="flex gap-2">
                 {#each ["low", "medium", "high"] as p}
                   <button
                     type="button"
-                    class="priority-option {p}"
-                    class:selected={form.priority === p}
+                    class="flex-1 py-2 px-2 rounded-md text-xs font-semibold uppercase tracking-wide transition-all
+                           {form.priority === p
+                             ? (p === 'high' ? 'bg-red-100 border-red-600 text-red-600' : 'bg-surface border-text text-text')
+                             : 'bg-bg border-transparent text-text-secondary hover:border-border'}
+                           border"
                     onclick={() => form.priority = p}
                   >
                     {p}
@@ -300,9 +358,9 @@
             </div>
           </div>
 
-          <div class="form-field">
-            <label for="client">Client</label>
-            <select id="client" bind:value={form.client_id}>
+          <div>
+            <label class="form-label">Client</label>
+            <select bind:value={form.client_id} class="form-input">
               <option value={null}>None</option>
               {#each clients as client}
                 <option value={client.id}>{client.name}</option>
@@ -313,622 +371,9 @@
 
         <footer class="modal-footer">
           <button type="button" class="btn-cancel" onclick={resetForm}>Cancel</button>
-          <button type="submit" class="btn-submit">{editingTodo ? "Save Changes" : "Add Task"}</button>
+          <button type="submit" class="btn-primary">{editingTodo ? "Save Changes" : "Add Task"}</button>
         </footer>
       </form>
     </div>
   </div>
 {/if}
-
-<style>
-  .page {
-    max-width: 720px;
-    margin: 0 auto;
-    animation: fadeIn 0.4s ease;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .page-header {
-    margin-bottom: 2rem;
-  }
-
-  .header-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .title-block h1 {
-    font-size: 2rem;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    margin-bottom: 0.5rem;
-    color: var(--color-text);
-  }
-
-  .stats-inline {
-    display: flex;
-    gap: 1rem;
-    font-size: 0.8125rem;
-    color: var(--color-text-muted);
-  }
-
-  .stat {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .stat.urgent {
-    color: #dc2626;
-    font-weight: 500;
-  }
-
-  .stat.overdue {
-    color: #dc2626;
-  }
-
-  .btn-add {
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    background: var(--color-text);
-    color: var(--color-surface);
-    padding: 0.75rem 1.25rem;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 0.875rem;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-  }
-
-  .btn-add:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
-  }
-
-  .btn-add-icon {
-    font-size: 1.125rem;
-    font-weight: 400;
-  }
-
-  .filters-bar {
-    margin-bottom: 1.5rem;
-    border-bottom: 1px solid var(--color-border-light);
-    padding-bottom: 0;
-  }
-
-  .filter-tabs {
-    display: flex;
-    gap: 0;
-  }
-
-  .filter-tabs button {
-    position: relative;
-    background: transparent;
-    color: var(--color-text-secondary);
-    padding: 0.75rem 0;
-    margin-right: 2rem;
-    font-weight: 500;
-    font-size: 0.9375rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    border-radius: 0;
-    transition: color 0.2s ease;
-  }
-
-  .filter-tabs button::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: transparent;
-    transition: background 0.2s ease;
-  }
-
-  .filter-tabs button:hover {
-    color: var(--color-text);
-  }
-
-  .filter-tabs button.active {
-    color: var(--color-text);
-  }
-
-  .filter-tabs button.active::after {
-    background: var(--color-text);
-  }
-
-  .filter-tabs .count {
-    font-size: 0.75rem;
-    background: var(--color-border-light);
-    padding: 0.125rem 0.5rem;
-    border-radius: 10px;
-    color: var(--color-text-secondary);
-  }
-
-  .filter-tabs button.active .count {
-    background: var(--color-text);
-    color: var(--color-surface);
-  }
-
-  .content {
-    min-height: 300px;
-  }
-
-  .task-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .task-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
-    background: var(--color-surface);
-    border-radius: 12px;
-    transition: all 0.2s ease;
-    animation: slideIn 0.3s ease backwards;
-    animation-delay: var(--delay);
-    position: relative;
-  }
-
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateX(-12px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-
-  .task-item:hover {
-    background: var(--color-surface);
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-  }
-
-  .task-item.completing {
-    animation: completeTask 0.6s ease forwards;
-  }
-
-  @keyframes completeTask {
-    0% { transform: scale(1); }
-    30% { transform: scale(1.02); background: #dcfce7; }
-    100% { transform: scale(1); opacity: 0.5; }
-  }
-
-  .task-item.completed {
-    opacity: 0.55;
-  }
-
-  .task-item.completed .task-title {
-    text-decoration: line-through;
-    color: var(--color-text-secondary);
-  }
-
-  .task-item.high::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: #dc2626;
-    border-radius: 12px 0 0 12px;
-  }
-
-  .task-item.overdue::before {
-    background: #dc2626;
-  }
-
-  .checkbox {
-    position: relative;
-    width: 22px;
-    height: 22px;
-    border: 2px solid var(--color-border);
-    border-radius: 6px;
-    background: transparent;
-    cursor: pointer;
-    flex-shrink: 0;
-    margin-top: 2px;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-  }
-
-  .checkbox:hover {
-    border-color: var(--color-primary);
-    background: var(--color-primary-light);
-  }
-
-  .check-icon {
-    width: 12px;
-    height: 12px;
-    opacity: 0;
-    transform: scale(0.5);
-    transition: all 0.2s ease;
-    stroke: var(--color-primary);
-  }
-
-  .check-ring {
-    position: absolute;
-    inset: -4px;
-    border: 2px solid var(--color-primary);
-    border-radius: 10px;
-    opacity: 0;
-    transform: scale(0.8);
-  }
-
-  .task-item.completed .checkbox {
-    background: var(--color-success);
-    border-color: var(--color-success);
-  }
-
-  .task-item.completed .check-icon {
-    opacity: 1;
-    transform: scale(1);
-    stroke: white;
-  }
-
-  .task-item.completing .check-ring {
-    animation: ringPulse 0.6s ease;
-  }
-
-  @keyframes ringPulse {
-    0% { opacity: 1; transform: scale(0.8); }
-    100% { opacity: 0; transform: scale(1.4); }
-  }
-
-  .task-body {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .task-main {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.25rem;
-  }
-
-  .task-title {
-    font-weight: 500;
-    color: var(--color-text);
-    font-size: 0.9375rem;
-    line-height: 1.4;
-  }
-
-  .priority-indicator {
-    width: 6px;
-    height: 6px;
-    background: #dc2626;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .task-desc {
-    margin: 0.25rem 0 0.5rem;
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
-    line-height: 1.5;
-  }
-
-  .task-meta {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  .meta-tag {
-    font-size: 0.75rem;
-    padding: 0.2rem 0.6rem;
-    background: var(--color-bg);
-    color: var(--color-text-secondary);
-    border-radius: 5px;
-    font-weight: 500;
-  }
-
-  .meta-tag.today {
-    background: #dbeafe;
-    color: #1d4ed8;
-  }
-
-  .meta-tag.soon {
-    background: #fef3c7;
-    color: #92400e;
-  }
-
-  .meta-tag.overdue {
-    background: #fee2e2;
-    color: #dc2626;
-  }
-
-  .meta-tag.client {
-    background: transparent;
-    border: 1px solid var(--color-border);
-    color: var(--color-text-muted);
-  }
-
-  .task-actions {
-    display: flex;
-    gap: 0.25rem;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-  }
-
-  .task-item:hover .task-actions {
-    opacity: 1;
-  }
-
-  .action-btn {
-    width: 32px;
-    height: 32px;
-    background: transparent;
-    color: var(--color-text-muted);
-    border-radius: 6px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s ease;
-  }
-
-  .action-btn:hover {
-    background: var(--color-bg);
-    color: var(--color-text);
-  }
-
-  .action-btn.delete:hover {
-    background: #fee2e2;
-    color: #dc2626;
-  }
-
-  .empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-  }
-
-  .empty-icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 1.5rem;
-    background: var(--color-bg);
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-text-muted);
-  }
-
-  .empty-title {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: var(--color-text);
-    margin: 0 0 0.5rem;
-  }
-
-  .empty-subtitle {
-    font-size: 0.9375rem;
-    color: var(--color-text-secondary);
-    margin: 0;
-  }
-
-  /* Modal */
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 1rem;
-    animation: fadeIn 0.2s ease;
-  }
-
-  .modal {
-    background: var(--color-surface);
-    border-radius: 16px;
-    width: 100%;
-    max-width: 480px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    animation: modalSlide 0.3s ease;
-    overflow: hidden;
-  }
-
-  @keyframes modalSlide {
-    from {
-      opacity: 0;
-      transform: translateY(20px) scale(0.98);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-
-  .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--color-border-light);
-  }
-
-  .modal-header h2 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin: 0;
-  }
-
-  .modal-close {
-    width: 32px;
-    height: 32px;
-    background: transparent;
-    color: var(--color-text-muted);
-    border-radius: 8px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s ease;
-  }
-
-  .modal-close:hover {
-    background: var(--color-bg);
-    color: var(--color-text);
-  }
-
-  .form-body {
-    padding: 1.5rem;
-  }
-
-  .form-field {
-    margin-bottom: 1rem;
-  }
-
-  .form-field label {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-secondary);
-    margin-bottom: 0.5rem;
-  }
-
-  .input-title {
-    font-size: 1.0625rem;
-    font-weight: 500;
-    padding: 0.875rem 1rem;
-    border: 1px solid var(--color-border);
-    border-radius: 10px;
-  }
-
-  .input-title:focus {
-    border-color: var(--color-text);
-    box-shadow: none;
-  }
-
-  .form-row-compact {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-  }
-
-  .priority-select {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .priority-option {
-    flex: 1;
-    padding: 0.5rem;
-    background: var(--color-bg);
-    border: 1px solid transparent;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--color-text-secondary);
-    transition: all 0.15s ease;
-  }
-
-  .priority-option:hover {
-    border-color: var(--color-border);
-  }
-
-  .priority-option.selected {
-    border-color: var(--color-text);
-    background: var(--color-surface);
-    color: var(--color-text);
-  }
-
-  .priority-option.high.selected {
-    background: #fee2e2;
-    border-color: #dc2626;
-    color: #dc2626;
-  }
-
-  .modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    background: var(--color-bg);
-    border-top: 1px solid var(--color-border-light);
-  }
-
-  .btn-cancel {
-    background: transparent;
-    color: var(--color-text-secondary);
-    padding: 0.625rem 1.25rem;
-    font-weight: 500;
-  }
-
-  .btn-cancel:hover {
-    color: var(--color-text);
-  }
-
-  .btn-submit {
-    background: var(--color-text);
-    color: var(--color-surface);
-    padding: 0.625rem 1.5rem;
-    font-weight: 600;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-  }
-
-  .btn-submit:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  }
-
-  @media (max-width: 640px) {
-    .page {
-      padding: 0 0.5rem;
-    }
-
-    .title-block h1 {
-      font-size: 1.5rem;
-    }
-
-    .btn-add-text {
-      display: none;
-    }
-
-    .btn-add {
-      padding: 0.75rem;
-    }
-
-    .btn-add-icon {
-      font-size: 1.25rem;
-    }
-
-    .task-actions {
-      opacity: 1;
-    }
-
-    .form-row-compact {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>

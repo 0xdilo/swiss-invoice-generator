@@ -208,64 +208,61 @@
   }
 </script>
 
-<div class="page">
-  <header class="page-header">
-    <div class="header-main">
-      <div class="month-nav">
-        <button class="nav-arrow" onclick={prevMonth} aria-label="Previous month">
+<div class="animate-fade-in">
+  <header class="mb-6">
+    <div class="flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <button class="w-9 h-9 bg-surface text-text-secondary rounded-[10px] flex items-center justify-center p-0 transition-all duration-150 shadow-sm hover:bg-bg hover:text-text" onclick={prevMonth} aria-label="Previous month">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15 18 9 12 15 6"/>
           </svg>
         </button>
-        <div class="month-display">
-          <span class="month-name">{currentMonth}</span>
-          <span class="year">{currentYear}</span>
+        <div class="flex items-baseline gap-2 min-w-[180px] justify-center">
+          <span class="text-2xl font-bold tracking-tight text-text">{currentMonth}</span>
+          <span class="text-lg text-text-muted font-medium">{currentYear}</span>
         </div>
-        <button class="nav-arrow" onclick={nextMonth} aria-label="Next month">
+        <button class="w-9 h-9 bg-surface text-text-secondary rounded-[10px] flex items-center justify-center p-0 transition-all duration-150 shadow-sm hover:bg-bg hover:text-text" onclick={nextMonth} aria-label="Next month">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
         </button>
       </div>
 
-      <div class="header-actions">
-        <button class="btn-today" onclick={goToToday}>Today</button>
-        <button class="btn-add" onclick={() => openNewEvent()}>
+      <div class="flex gap-3">
+        <button class="bg-surface text-text px-4 py-2.5 font-medium rounded-[10px] shadow-sm transition-all duration-150 hover:bg-bg" onclick={goToToday}>Today</button>
+        <button class="flex items-center gap-2 bg-text text-surface px-5 py-2.5 font-semibold rounded-[10px] shadow-md transition-all duration-200 hover:-translate-y-px hover:shadow-lg" onclick={() => openNewEvent()}>
           <span>+</span>
-          <span class="btn-add-text">New Event</span>
+          <span class="max-sm:hidden">New Event</span>
         </button>
       </div>
     </div>
   </header>
 
-  <div class="calendar-layout">
-    <div class="calendar-main">
-      <div class="calendar-grid">
-        <div class="weekday-row">
+  <div class="grid grid-cols-[1fr_280px] gap-6 max-[900px]:grid-cols-1">
+    <div class="bg-surface rounded-2xl p-4 shadow-sm">
+      <div class="mb-2">
+        <div class="grid grid-cols-7 mb-2">
           {#each [0, 1, 2, 3, 4, 5, 6] as i}
-            <div class="weekday-cell" class:weekend={i >= 5}>{getWeekday(i)}</div>
+            <div class="text-center text-[11px] font-semibold uppercase tracking-wider py-2 {i >= 5 ? 'text-text-muted' : 'text-text-secondary'}">{getWeekday(i)}</div>
           {/each}
         </div>
 
-        <div class="days-grid">
+        <div class="grid grid-cols-7 gap-0.5">
           {#each calendarDays as day, i}
             <button
-              class="day-cell"
-              class:other-month={!day.isCurrentMonth}
-              class:today={isToday(day.date)}
-              class:has-events={day.events.length > 0}
+              class="bg-transparent rounded-lg flex flex-col items-center justify-start px-1 py-2 min-h-[72px] cursor-pointer transition-all duration-150 relative max-sm:px-0 max-sm:py-1 {!day.isCurrentMonth ? 'opacity-50' : ''} {isToday(day.date) ? 'bg-primary-light' : ''} hover:bg-bg"
               onclick={() => openDayView(day)}
-              style="--delay: {Math.floor(i / 7) * 0.02}s"
+              style="animation: dayFadeIn 0.3s ease backwards; animation-delay: {Math.floor(i / 7) * 0.02}s;"
             >
-              <span class="day-number">{day.date.getDate()}</span>
+              <span class="text-[13px] font-medium leading-6 {isToday(day.date) ? 'bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center font-semibold' : 'text-text'} {!day.isCurrentMonth ? 'text-text-muted opacity-50' : ''}">{day.date.getDate()}</span>
 
               {#if day.events.length > 0}
-                <div class="day-events">
+                <div class="flex gap-[3px] mt-1 items-center">
                   {#each day.events.slice(0, 2) as event}
-                    <div class="event-dot" style="background-color: {event.color || '#3b82f6'}"></div>
+                    <div class="w-1.5 h-1.5 rounded-full" style="background-color: {event.color || '#3b82f6'}"></div>
                   {/each}
                   {#if day.events.length > 2}
-                    <span class="event-count">+{day.events.length - 2}</span>
+                    <span class="text-[10px] text-text-muted font-medium">+{day.events.length - 2}</span>
                   {/if}
                 </div>
               {/if}
@@ -275,19 +272,19 @@
       </div>
     </div>
 
-    <aside class="sidebar-panel">
-      <div class="panel-section">
-        <h3 class="panel-title">Today</h3>
+    <aside class="flex flex-col gap-6 max-[900px]:grid max-[900px]:grid-cols-2 max-[900px]:gap-4 max-sm:grid-cols-1">
+      <div class="bg-surface rounded-2xl p-5 shadow-sm">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-text-secondary m-0 mb-4">Today</h3>
         {#if todayEvents.length === 0}
-          <p class="panel-empty">No events today</p>
+          <p class="text-sm text-text-muted m-0">No events today</p>
         {:else}
-          <div class="event-list">
+          <div class="flex flex-col gap-2">
             {#each todayEvents as event}
-              <button class="event-card" onclick={() => openEditEvent(event)}>
-                <div class="event-color" style="background-color: {event.color || '#3b82f6'}"></div>
-                <div class="event-info">
-                  <span class="event-title">{event.title}</span>
-                  <span class="event-time">
+              <button class="flex items-center gap-3 p-3 bg-bg rounded-[10px] text-left w-full transition-all duration-150 hover:bg-border-light" onclick={() => openEditEvent(event)}>
+                <div class="w-1 h-8 rounded-sm flex-shrink-0" style="background-color: {event.color || '#3b82f6'}"></div>
+                <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <span class="text-sm font-medium text-text whitespace-nowrap overflow-hidden text-ellipsis">{event.title}</span>
+                  <span class="text-xs text-text-muted">
                     {#if event.all_day}
                       All day
                     {:else}
@@ -301,18 +298,18 @@
         {/if}
       </div>
 
-      <div class="panel-section">
-        <h3 class="panel-title">Upcoming</h3>
+      <div class="bg-surface rounded-2xl p-5 shadow-sm">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-text-secondary m-0 mb-4">Upcoming</h3>
         {#if upcomingEvents.length === 0}
-          <p class="panel-empty">No upcoming events</p>
+          <p class="text-sm text-text-muted m-0">No upcoming events</p>
         {:else}
-          <div class="event-list">
+          <div class="flex flex-col gap-2">
             {#each upcomingEvents as event}
-              <button class="event-card compact" onclick={() => openEditEvent(event)}>
-                <div class="event-color" style="background-color: {event.color || '#3b82f6'}"></div>
-                <div class="event-info">
-                  <span class="event-title">{event.title}</span>
-                  <span class="event-date">
+              <button class="flex items-center gap-3 py-2.5 px-3 bg-bg rounded-[10px] text-left w-full transition-all duration-150 hover:bg-border-light" onclick={() => openEditEvent(event)}>
+                <div class="w-1 h-6 rounded-sm flex-shrink-0" style="background-color: {event.color || '#3b82f6'}"></div>
+                <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <span class="text-sm font-medium text-text whitespace-nowrap overflow-hidden text-ellipsis">{event.title}</span>
+                  <span class="text-xs text-text-muted">
                     {new Date(event.start_datetime).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </span>
                 </div>
@@ -327,12 +324,12 @@
 
 {#if viewingDay}
   <div class="modal-backdrop" onclick={() => viewingDay = null} role="button" tabindex="-1" onkeydown={(e) => e.key === 'Escape' && (viewingDay = null)}>
-    <div class="day-modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-      <header class="day-modal-header">
-        <h2>{formatFullDate(viewingDay.date)}</h2>
-        <div class="day-modal-actions">
-          <button class="btn-add-small" onclick={() => openNewEvent(viewingDay.date)}>+ Add</button>
-          <button class="modal-close" onclick={() => viewingDay = null} aria-label="Close">
+    <div class="bg-surface rounded-2xl w-full max-w-[400px] shadow-2xl animate-modal-slide overflow-hidden" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+      <header class="flex justify-between items-center px-6 py-5 border-b border-border-light">
+        <h2 class="text-base font-semibold m-0">{formatFullDate(viewingDay.date)}</h2>
+        <div class="flex gap-2 items-center">
+          <button class="bg-bg text-text px-3 py-1.5 text-[13px] font-medium rounded-md transition-all duration-150 hover:bg-border-light" onclick={() => openNewEvent(viewingDay.date)}>+ Add</button>
+          <button class="w-8 h-8 bg-transparent text-text-muted rounded-lg p-0 flex items-center justify-center transition-all duration-150 hover:bg-bg hover:text-text" onclick={() => viewingDay = null} aria-label="Close">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
@@ -340,16 +337,16 @@
           </button>
         </div>
       </header>
-      <div class="day-modal-body">
+      <div class="px-6 pt-4 pb-6 flex flex-col gap-2 max-h-[400px] overflow-y-auto">
         {#each viewingDay.events as event}
-          <button class="day-event-card" onclick={() => openEditEvent(event)}>
-            <div class="day-event-color" style="background-color: {event.color || '#3b82f6'}"></div>
-            <div class="day-event-content">
-              <span class="day-event-title">{event.title}</span>
+          <button class="flex gap-3 p-3.5 bg-bg rounded-[10px] text-left w-full transition-all duration-150 hover:bg-border-light" onclick={() => openEditEvent(event)}>
+            <div class="w-1 rounded-sm flex-shrink-0" style="background-color: {event.color || '#3b82f6'}"></div>
+            <div class="flex-1 min-w-0">
+              <span class="block font-medium text-text mb-1">{event.title}</span>
               {#if event.description}
-                <p class="day-event-desc">{event.description}</p>
+                <p class="text-[13px] text-text-secondary m-0 mb-1.5 leading-relaxed">{event.description}</p>
               {/if}
-              <span class="day-event-time">
+              <span class="text-xs text-text-muted">
                 {#if event.all_day}
                   All day
                 {:else}
@@ -366,10 +363,10 @@
 
 {#if showForm}
   <div class="modal-backdrop" onclick={resetForm} role="button" tabindex="-1" onkeydown={(e) => e.key === 'Escape' && resetForm()}>
-    <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+    <div class="modal max-w-[480px]" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
       <header class="modal-header">
-        <h2>{editingEvent ? "Edit Event" : "New Event"}</h2>
-        <button class="modal-close" onclick={resetForm} aria-label="Close">
+        <h2 class="text-lg font-semibold m-0">{editingEvent ? "Edit Event" : "New Event"}</h2>
+        <button class="w-8 h-8 bg-transparent text-text-muted rounded-lg p-0 flex items-center justify-center transition-all duration-150 hover:bg-bg hover:text-text" onclick={resetForm} aria-label="Close">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -378,26 +375,25 @@
       </header>
 
       <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-        <div class="form-body">
-          <div class="form-field">
+        <div class="p-6">
+          <div class="mb-4">
             <input
               id="title"
               type="text"
               bind:value={form.title}
               required
               placeholder="Event title"
-              class="input-title"
+              class="w-full text-[17px] font-medium px-4 py-3.5 border border-border rounded-[10px] transition-all duration-150 focus:border-text focus:shadow-none focus:outline-none"
             />
           </div>
 
-          <div class="form-field">
-            <label>Type</label>
-            <div class="type-select">
+          <div class="mb-4">
+            <label class="form-label">Type</label>
+            <div class="flex gap-2 flex-wrap">
               {#each eventTypes as type}
                 <button
                   type="button"
-                  class="type-option"
-                  class:selected={form.event_type === type.value}
+                  class="px-3.5 py-2 bg-bg border border-transparent rounded-lg text-[13px] font-medium text-text-secondary transition-all duration-150 hover:border-border {form.event_type === type.value ? 'bg-surface border-text text-text' : ''}"
                   onclick={() => form.event_type = type.value}
                 >
                   {type.label}
@@ -406,37 +402,37 @@
             </div>
           </div>
 
-          <div class="form-field">
-            <label class="toggle-label">
-              <input type="checkbox" bind:checked={form.all_day} />
-              <span class="toggle-track">
-                <span class="toggle-thumb"></span>
+          <div class="mb-4">
+            <label class="flex items-center gap-3 cursor-pointer text-[15px] text-text">
+              <input type="checkbox" bind:checked={form.all_day} class="hidden" />
+              <span class="w-11 h-6 rounded-xl relative transition-colors duration-200 {form.all_day ? 'bg-primary' : 'bg-border'}">
+                <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 {form.all_day ? 'translate-x-5' : ''}"></span>
               </span>
               <span>All day</span>
             </label>
           </div>
 
-          <div class="form-row">
-            <div class="form-field">
-              <label for="start">Start</label>
-              <input id="start" type={form.all_day ? "date" : "datetime-local"} bind:value={form.start_datetime} required />
+          <div class="grid grid-cols-2 gap-4 mb-4 max-sm:grid-cols-1">
+            <div>
+              <label for="start" class="form-label">Start</label>
+              <input id="start" type={form.all_day ? "date" : "datetime-local"} bind:value={form.start_datetime} required class="form-input" />
             </div>
             {#if !form.all_day}
-              <div class="form-field">
-                <label for="end">End</label>
-                <input id="end" type="datetime-local" bind:value={form.end_datetime} />
+              <div>
+                <label for="end" class="form-label">End</label>
+                <input id="end" type="datetime-local" bind:value={form.end_datetime} class="form-input" />
               </div>
             {/if}
           </div>
 
-          <div class="form-field">
-            <label for="description">Notes</label>
-            <textarea id="description" bind:value={form.description} placeholder="Add details..." rows="2"></textarea>
+          <div class="mb-4">
+            <label for="description" class="form-label">Notes</label>
+            <textarea id="description" bind:value={form.description} placeholder="Add details..." rows="2" class="form-input resize-none"></textarea>
           </div>
 
-          <div class="form-field">
-            <label for="client">Client</label>
-            <select id="client" bind:value={form.client_id}>
+          <div class="mb-4">
+            <label for="client" class="form-label">Client</label>
+            <select id="client" bind:value={form.client_id} class="form-input">
               <option value={null}>None</option>
               {#each clients as client}
                 <option value={client.id}>{client.name}</option>
@@ -444,14 +440,13 @@
             </select>
           </div>
 
-          <div class="form-field">
-            <label>Color</label>
-            <div class="color-select">
+          <div class="mb-4">
+            <label class="form-label">Color</label>
+            <div class="flex gap-2.5">
               {#each colors as color}
                 <button
                   type="button"
-                  class="color-option"
-                  class:selected={form.color === color.value}
+                  class="w-8 h-8 rounded-full border-2 border-transparent cursor-pointer transition-all duration-150 flex items-center justify-center text-white p-0 hover:scale-110 {form.color === color.value ? 'border-text shadow-[0_0_0_2px_var(--color-surface)]' : ''}"
                   style="background-color: {color.value}"
                   onclick={() => form.color = color.value}
                   aria-label={color.name}
@@ -469,11 +464,11 @@
 
         <footer class="modal-footer">
           {#if editingEvent}
-            <button type="button" class="btn-delete" onclick={handleDelete}>Delete</button>
+            <button type="button" class="bg-transparent text-danger px-4 py-2.5 font-medium hover:bg-danger-light" onclick={handleDelete}>Delete</button>
           {/if}
-          <div class="spacer"></div>
+          <div class="flex-1"></div>
           <button type="button" class="btn-cancel" onclick={resetForm}>Cancel</button>
-          <button type="submit" class="btn-submit">{editingEvent ? "Save" : "Create"}</button>
+          <button type="submit" class="bg-text text-surface px-6 py-2.5 font-semibold rounded-lg transition-all duration-200 hover:-translate-y-px hover:shadow-lg">{editingEvent ? "Save" : "Create"}</button>
         </footer>
       </form>
     </div>
@@ -481,699 +476,8 @@
 {/if}
 
 <style>
-  .page {
-    animation: fadeIn 0.4s ease;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .page-header {
-    margin-bottom: 1.5rem;
-  }
-
-  .header-main {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .month-nav {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .nav-arrow {
-    width: 36px;
-    height: 36px;
-    background: var(--color-surface);
-    color: var(--color-text-secondary);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    transition: all 0.15s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  }
-
-  .nav-arrow:hover {
-    background: var(--color-bg);
-    color: var(--color-text);
-  }
-
-  .month-display {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    min-width: 180px;
-    justify-content: center;
-  }
-
-  .month-name {
-    font-size: 1.5rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: var(--color-text);
-  }
-
-  .year {
-    font-size: 1.125rem;
-    color: var(--color-text-muted);
-    font-weight: 500;
-  }
-
-  .header-actions {
-    display: flex;
-    gap: 0.75rem;
-  }
-
-  .btn-today {
-    background: var(--color-surface);
-    color: var(--color-text);
-    padding: 0.625rem 1rem;
-    font-weight: 500;
-    border-radius: 10px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-    transition: all 0.15s ease;
-  }
-
-  .btn-today:hover {
-    background: var(--color-bg);
-  }
-
-  .btn-add {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: var(--color-text);
-    color: var(--color-surface);
-    padding: 0.625rem 1.25rem;
-    font-weight: 600;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-    transition: all 0.2s ease;
-  }
-
-  .btn-add:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
-  }
-
-  .calendar-layout {
-    display: grid;
-    grid-template-columns: 1fr 280px;
-    gap: 1.5rem;
-  }
-
-  .calendar-main {
-    background: var(--color-surface);
-    border-radius: 16px;
-    padding: 1rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-  }
-
-  .weekday-row {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    margin-bottom: 0.5rem;
-  }
-
-  .weekday-cell {
-    text-align: center;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-secondary);
-    padding: 0.5rem 0;
-  }
-
-  .weekday-cell.weekend {
-    color: var(--color-text-muted);
-  }
-
-  .days-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 2px;
-  }
-
-  .day-cell {
-    background: transparent;
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    padding: 0.5rem 0.25rem;
-    min-height: 72px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    animation: dayFadeIn 0.3s ease backwards;
-    animation-delay: var(--delay);
-    position: relative;
-  }
-
   @keyframes dayFadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
-  }
-
-  .day-cell:hover {
-    background: var(--color-bg);
-  }
-
-  .day-cell.other-month .day-number {
-    color: var(--color-text-muted);
-    opacity: 0.5;
-  }
-
-  .day-cell.today {
-    background: var(--color-primary-light);
-  }
-
-  .day-cell.today .day-number {
-    background: var(--color-primary);
-    color: white;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-  }
-
-  .day-number {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: var(--color-text);
-    line-height: 24px;
-  }
-
-  .day-events {
-    display: flex;
-    gap: 3px;
-    margin-top: 4px;
-    align-items: center;
-  }
-
-  .event-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-  }
-
-  .event-count {
-    font-size: 0.625rem;
-    color: var(--color-text-muted);
-    font-weight: 500;
-  }
-
-  .sidebar-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-
-  .panel-section {
-    background: var(--color-surface);
-    border-radius: 16px;
-    padding: 1.25rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-  }
-
-  .panel-title {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-secondary);
-    margin: 0 0 1rem;
-  }
-
-  .panel-empty {
-    font-size: 0.875rem;
-    color: var(--color-text-muted);
-    margin: 0;
-  }
-
-  .event-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .event-card {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    background: var(--color-bg);
-    border-radius: 10px;
-    text-align: left;
-    width: 100%;
-    transition: all 0.15s ease;
-  }
-
-  .event-card:hover {
-    background: var(--color-border-light);
-  }
-
-  .event-card.compact {
-    padding: 0.625rem 0.75rem;
-  }
-
-  .event-color {
-    width: 4px;
-    height: 32px;
-    border-radius: 2px;
-    flex-shrink: 0;
-  }
-
-  .event-card.compact .event-color {
-    height: 24px;
-  }
-
-  .event-info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-  }
-
-  .event-title {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--color-text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .event-time,
-  .event-date {
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-  }
-
-  /* Day View Modal */
-  .day-modal {
-    background: var(--color-surface);
-    border-radius: 16px;
-    width: 100%;
-    max-width: 400px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    animation: modalSlide 0.3s ease;
-    overflow: hidden;
-  }
-
-  .day-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--color-border-light);
-  }
-
-  .day-modal-header h2 {
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0;
-  }
-
-  .day-modal-actions {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
-
-  .btn-add-small {
-    background: var(--color-bg);
-    color: var(--color-text);
-    padding: 0.375rem 0.75rem;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    border-radius: 6px;
-    transition: all 0.15s ease;
-  }
-
-  .btn-add-small:hover {
-    background: var(--color-border-light);
-  }
-
-  .day-modal-body {
-    padding: 1rem 1.5rem 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    max-height: 400px;
-    overflow-y: auto;
-  }
-
-  .day-event-card {
-    display: flex;
-    gap: 0.75rem;
-    padding: 0.875rem;
-    background: var(--color-bg);
-    border-radius: 10px;
-    text-align: left;
-    width: 100%;
-    transition: all 0.15s ease;
-  }
-
-  .day-event-card:hover {
-    background: var(--color-border-light);
-  }
-
-  .day-event-color {
-    width: 4px;
-    border-radius: 2px;
-    flex-shrink: 0;
-  }
-
-  .day-event-content {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .day-event-title {
-    display: block;
-    font-weight: 500;
-    color: var(--color-text);
-    margin-bottom: 0.25rem;
-  }
-
-  .day-event-desc {
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
-    margin: 0 0 0.375rem;
-    line-height: 1.4;
-  }
-
-  .day-event-time {
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-  }
-
-  /* Form Modal */
-  .modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 1rem;
-    animation: fadeIn 0.2s ease;
-  }
-
-  .modal {
-    background: var(--color-surface);
-    border-radius: 16px;
-    width: 100%;
-    max-width: 480px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    animation: modalSlide 0.3s ease;
-    overflow: hidden;
-  }
-
-  @keyframes modalSlide {
-    from {
-      opacity: 0;
-      transform: translateY(20px) scale(0.98);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-
-  .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--color-border-light);
-  }
-
-  .modal-header h2 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin: 0;
-  }
-
-  .modal-close {
-    width: 32px;
-    height: 32px;
-    background: transparent;
-    color: var(--color-text-muted);
-    border-radius: 8px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s ease;
-  }
-
-  .modal-close:hover {
-    background: var(--color-bg);
-    color: var(--color-text);
-  }
-
-  .form-body {
-    padding: 1.5rem;
-  }
-
-  .form-field {
-    margin-bottom: 1rem;
-  }
-
-  .form-field label {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-text-secondary);
-    margin-bottom: 0.5rem;
-  }
-
-  .input-title {
-    font-size: 1.0625rem;
-    font-weight: 500;
-    padding: 0.875rem 1rem;
-    border: 1px solid var(--color-border);
-    border-radius: 10px;
-  }
-
-  .input-title:focus {
-    border-color: var(--color-text);
-    box-shadow: none;
-  }
-
-  .form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-  }
-
-  .type-select {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  .type-option {
-    padding: 0.5rem 0.875rem;
-    background: var(--color-bg);
-    border: 1px solid transparent;
-    border-radius: 8px;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: var(--color-text-secondary);
-    transition: all 0.15s ease;
-  }
-
-  .type-option:hover {
-    border-color: var(--color-border);
-  }
-
-  .type-option.selected {
-    background: var(--color-surface);
-    border-color: var(--color-text);
-    color: var(--color-text);
-  }
-
-  .toggle-label {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    cursor: pointer;
-    font-size: 0.9375rem;
-    color: var(--color-text);
-    font-weight: 400;
-  }
-
-  .toggle-label input {
-    display: none;
-  }
-
-  .toggle-track {
-    width: 44px;
-    height: 24px;
-    background: var(--color-border);
-    border-radius: 12px;
-    position: relative;
-    transition: background 0.2s ease;
-  }
-
-  .toggle-label input:checked + .toggle-track {
-    background: var(--color-primary);
-  }
-
-  .toggle-thumb {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 20px;
-    height: 20px;
-    background: white;
-    border-radius: 50%;
-    transition: transform 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-  }
-
-  .toggle-label input:checked + .toggle-track .toggle-thumb {
-    transform: translateX(20px);
-  }
-
-  .color-select {
-    display: flex;
-    gap: 0.625rem;
-  }
-
-  .color-option {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    padding: 0;
-  }
-
-  .color-option:hover {
-    transform: scale(1.1);
-  }
-
-  .color-option.selected {
-    border-color: var(--color-text);
-    box-shadow: 0 0 0 2px var(--color-surface);
-  }
-
-  .modal-footer {
-    display: flex;
-    gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    background: var(--color-bg);
-    border-top: 1px solid var(--color-border-light);
-  }
-
-  .spacer {
-    flex: 1;
-  }
-
-  .btn-cancel {
-    background: transparent;
-    color: var(--color-text-secondary);
-    padding: 0.625rem 1.25rem;
-    font-weight: 500;
-  }
-
-  .btn-cancel:hover {
-    color: var(--color-text);
-  }
-
-  .btn-submit {
-    background: var(--color-text);
-    color: var(--color-surface);
-    padding: 0.625rem 1.5rem;
-    font-weight: 600;
-    border-radius: 8px;
-    transition: all 0.2s ease;
-  }
-
-  .btn-submit:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  }
-
-  .btn-delete {
-    background: transparent;
-    color: #dc2626;
-    padding: 0.625rem 1rem;
-    font-weight: 500;
-  }
-
-  .btn-delete:hover {
-    background: #fee2e2;
-  }
-
-  @media (max-width: 900px) {
-    .calendar-layout {
-      grid-template-columns: 1fr;
-    }
-
-    .sidebar-panel {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
-  }
-
-  @media (max-width: 640px) {
-    .month-display {
-      min-width: 140px;
-    }
-
-    .month-name {
-      font-size: 1.25rem;
-    }
-
-    .btn-add-text {
-      display: none;
-    }
-
-    .btn-add {
-      padding: 0.625rem 0.875rem;
-    }
-
-    .sidebar-panel {
-      grid-template-columns: 1fr;
-    }
-
-    .day-cell {
-      padding: 0.25rem;
-    }
-
-    .day-number {
-      font-size: 0.8125rem;
-    }
-
-    .form-row {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

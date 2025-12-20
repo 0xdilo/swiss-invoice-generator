@@ -247,13 +247,13 @@
   }
 </script>
 
-<div class="invoices-page">
-  <header class="page-header">
-    <div class="header-content">
-      <h1>Invoices</h1>
-      <p class="subtitle">Manage your billing and payments</p>
+<div class="max-w-screen-xl mx-auto">
+  <header class="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+    <div>
+      <h1 class="text-[1.75rem] font-bold m-0 tracking-tight">Invoices</h1>
+      <p class="mt-1 mb-0 text-text-secondary text-[0.9375rem]">Manage your billing and payments</p>
     </div>
-    <button class="btn-create" onclick={() => { showForm = !showForm; if (!showForm) cancelForm(); }}>
+    <button class="flex items-center gap-2 px-5 py-2.5 bg-primary text-white border-none rounded-[10px] text-[0.9375rem] font-semibold cursor-pointer transition-all duration-200 hover:bg-primary-hover hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(59,130,246,0.3)] w-full sm:w-auto justify-center" onclick={() => { showForm = !showForm; if (!showForm) cancelForm(); }}>
       {#if showForm}
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"/>
@@ -270,62 +270,62 @@
     </button>
   </header>
 
-  <div class="stats-bar">
-    <div class="stat-item">
-      <span class="stat-label">Total</span>
-      <span class="stat-value">{stats.total}</span>
+  <div class="flex flex-wrap items-center gap-6 px-6 py-4 bg-surface rounded-[14px] shadow-[0_1px_3px_rgba(0,0,0,0.04)] mb-6">
+    <div class="flex flex-col gap-0.5">
+      <span class="text-xs text-text-muted uppercase tracking-wide font-medium">Total</span>
+      <span class="text-xl font-bold text-text">{stats.total}</span>
     </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item">
-      <span class="stat-label">Draft</span>
-      <span class="stat-value muted">{stats.draft}</span>
+    <div class="w-px h-8 bg-border-light hidden sm:block"></div>
+    <div class="flex flex-col gap-0.5">
+      <span class="text-xs text-text-muted uppercase tracking-wide font-medium">Draft</span>
+      <span class="text-xl font-bold text-text-secondary">{stats.draft}</span>
     </div>
-    <div class="stat-item">
-      <span class="stat-label">Sent</span>
-      <span class="stat-value warning">{stats.sent}</span>
+    <div class="flex flex-col gap-0.5">
+      <span class="text-xs text-text-muted uppercase tracking-wide font-medium">Sent</span>
+      <span class="text-xl font-bold text-[#d97706]">{stats.sent}</span>
     </div>
-    <div class="stat-item">
-      <span class="stat-label">Paid</span>
-      <span class="stat-value success">{stats.paid}</span>
+    <div class="flex flex-col gap-0.5">
+      <span class="text-xs text-text-muted uppercase tracking-wide font-medium">Paid</span>
+      <span class="text-xl font-bold text-[#059669]">{stats.paid}</span>
     </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item featured">
-      <span class="stat-label">Revenue</span>
-      <span class="stat-value">{formatCurrency(stats.paidAmount)}</span>
+    <div class="w-px h-8 bg-border-light hidden sm:block"></div>
+    <div class="flex flex-col gap-0.5 sm:ml-auto w-full sm:w-auto sm:pt-0 pt-3 sm:border-t-0 border-t border-border-light">
+      <span class="text-xs text-text-muted uppercase tracking-wide font-medium">Revenue</span>
+      <span class="text-xl font-bold text-text">{formatCurrency(stats.paidAmount)}</span>
     </div>
   </div>
 
   {#if showForm}
-    <div class="form-container">
-      <div class="form-badge">{editing !== null ? "Edit" : "New"}</div>
-      <form onsubmit={(e) => { e.preventDefault(); submit(); }}>
-        <div class="form-section">
-          <h3>Invoice Details</h3>
-          <div class="form-row">
-            <div class="form-field flex-2">
-              <label>Title</label>
-              <input placeholder="e.g., Website Maintenance Q4 2024" bind:value={invoiceTitle} required />
+    <div class="card mb-6 overflow-hidden animate-slide-down relative">
+      <div class="absolute top-5 right-6 bg-primary text-white text-[0.6875rem] font-semibold px-2.5 py-1 rounded-md uppercase tracking-wide">{editing !== null ? "Edit" : "New"}</div>
+      <form class="p-6" onsubmit={(e) => { e.preventDefault(); submit(); }}>
+        <div class="mb-6 pb-6 border-b border-border-light">
+          <h3 class="text-[0.9375rem] font-semibold m-0 mb-4 text-text">Invoice Details</h3>
+          <div class="flex flex-col sm:flex-row gap-4 mb-4">
+            <div class="flex flex-col gap-1.5 flex-[2]">
+              <label class="form-label">Title</label>
+              <input class="form-input" placeholder="e.g., Website Maintenance Q4 2024" bind:value={invoiceTitle} required />
             </div>
           </div>
-          <div class="form-row">
-            <div class="form-field flex-2">
-              <label>Description</label>
-              <input placeholder="Brief description (optional)" bind:value={invoiceDescription} />
+          <div class="flex flex-col sm:flex-row gap-4 mb-4">
+            <div class="flex flex-col gap-1.5 flex-[2]">
+              <label class="form-label">Description</label>
+              <input class="form-input" placeholder="Brief description (optional)" bind:value={invoiceDescription} />
             </div>
           </div>
-          <div class="form-row">
-            <div class="form-field">
-              <label>Client</label>
-              <select bind:value={client_id} required>
+          <div class="flex flex-col sm:flex-row gap-4 mb-4">
+            <div class="flex flex-col gap-1.5 flex-1">
+              <label class="form-label">Client</label>
+              <select class="form-input" bind:value={client_id} required>
                 <option value="" disabled>Select client</option>
                 {#each clients as c}
                   <option value={c.id}>{c.name}</option>
                 {/each}
               </select>
             </div>
-            <div class="form-field">
-              <label>Template</label>
-              <select bind:value={template_id} required>
+            <div class="flex flex-col gap-1.5 flex-1">
+              <label class="form-label">Template</label>
+              <select class="form-input" bind:value={template_id} required>
                 <option value="" disabled>Select template</option>
                 {#each templates as t}
                   <option value={t.id}>{t.name}</option>
@@ -335,20 +335,21 @@
           </div>
 
           {#if showLogoUploadUI}
-            <div class="form-row">
-              <div class="form-field">
-                <label>Logo</label>
-                <input type="file" accept="image/*" bind:files={logoUploadFile} />
+            <div class="flex flex-col sm:flex-row gap-4 mb-4">
+              <div class="flex flex-col gap-1.5 flex-1">
+                <label class="form-label">Logo</label>
+                <input class="form-input" type="file" accept="image/*" bind:files={logoUploadFile} />
               </div>
             </div>
           {/if}
 
           {#if dynamicFields.length > 0}
-            <div class="form-row">
+            <div class="flex flex-col sm:flex-row gap-4">
               {#each dynamicFields as field}
-                <div class="form-field">
-                  <label>{field}</label>
+                <div class="flex flex-col gap-1.5 flex-1">
+                  <label class="form-label">{field}</label>
                   <input
+                    class="form-input"
                     placeholder="Enter {field}"
                     bind:value={dynamicData[field]}
                     type={field.toLowerCase().includes("date") ? "date" : "text"}
@@ -360,10 +361,10 @@
           {/if}
         </div>
 
-        <div class="form-section">
-          <div class="section-header">
-            <h3>Line Items</h3>
-            <button type="button" class="btn-add-item" onclick={addItem}>
+        <div class="mb-6 pb-6 border-b border-border-light">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-[0.9375rem] font-semibold m-0 text-text">Line Items</h3>
+            <button type="button" class="flex items-center gap-1.5 px-3.5 py-2 bg-transparent text-primary border border-dashed border-primary rounded-lg text-[0.8125rem] font-medium cursor-pointer transition-all duration-200 hover:bg-primary/10" onclick={addItem}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
@@ -372,31 +373,31 @@
             </button>
           </div>
 
-          <div class="items-table">
-            <div class="items-header">
-              <span class="col-desc">Description</span>
-              <span class="col-price">Price</span>
-              <span class="col-qty">Qty</span>
-              <span class="col-total">Total</span>
-              <span class="col-action"></span>
+          <div class="bg-bg rounded-[10px] overflow-hidden">
+            <div class="hidden sm:grid grid-cols-[3fr_120px_80px_120px_40px] gap-3 px-4 py-3 bg-surface border-b border-border-light text-[0.6875rem] font-semibold text-text-muted uppercase tracking-wide">
+              <span>Description</span>
+              <span>Price</span>
+              <span>Qty</span>
+              <span>Total</span>
+              <span></span>
             </div>
             {#each items as item, i}
-              <div class="item-row" style="animation-delay: {i * 50}ms">
-                <div class="col-desc">
-                  <input placeholder="Service description" bind:value={item.desc} required />
+              <div class="grid grid-cols-1 sm:grid-cols-[3fr_120px_80px_120px_40px] gap-2 sm:gap-3 px-4 py-3 sm:items-center border-b border-border-light last:border-b-0 animate-fade-in relative" style="animation-delay: {i * 50}ms">
+                <div>
+                  <input class="px-3 py-2 border border-border-light rounded-md text-sm bg-white w-full focus:outline-none focus:border-primary" placeholder="Service description" bind:value={item.desc} required />
                 </div>
-                <div class="col-price">
-                  <input type="number" placeholder="0.00" bind:value={item.price} step="0.01" min="0" required />
+                <div>
+                  <input class="px-3 py-2 border border-border-light rounded-md text-sm bg-white w-full focus:outline-none focus:border-primary" type="number" placeholder="0.00" bind:value={item.price} step="0.01" min="0" required />
                 </div>
-                <div class="col-qty">
-                  <input type="number" placeholder="1" bind:value={item.qty} step="0.1" min="0" required />
+                <div>
+                  <input class="px-3 py-2 border border-border-light rounded-md text-sm bg-white w-full focus:outline-none focus:border-primary" type="number" placeholder="1" bind:value={item.qty} step="0.1" min="0" required />
                 </div>
-                <div class="col-total">
-                  <span>{formatCurrency(item.price * item.qty)}</span>
+                <div class="sm:pt-0 pt-2 sm:border-t-0 border-t border-border-light sm:text-left">
+                  <span class="font-semibold text-text-secondary">{formatCurrency(item.price * item.qty)}</span>
                 </div>
-                <div class="col-action">
+                <div class="sm:static absolute top-2 right-2">
                   {#if items.length > 1}
-                    <button type="button" class="btn-remove" onclick={() => removeItem(i)}>
+                    <button type="button" class="w-8 h-8 flex items-center justify-center bg-transparent border-none rounded-md text-text-muted cursor-pointer transition-all duration-150 hover:bg-red-50 hover:text-red-500" onclick={() => removeItem(i)}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"/>
                         <line x1="6" y1="6" x2="18" y2="18"/>
@@ -406,25 +407,27 @@
                 </div>
               </div>
             {/each}
-            <div class="items-footer">
-              <span class="items-total-label">Subtotal</span>
-              <span class="items-total-value">{formatCurrency(itemsTotal)}</span>
+            <div class="flex justify-end items-center gap-8 px-4 py-4 bg-surface border-t border-border-light">
+              <span class="text-sm text-text-secondary font-medium">Subtotal</span>
+              <span class="text-lg font-bold text-text">{formatCurrency(itemsTotal)}</span>
             </div>
           </div>
         </div>
 
-        <div class="form-section compact">
-          <label class="toggle-control">
-            <input type="checkbox" bind:checked={isRecurring} />
-            <div class="toggle-switch"></div>
-            <div class="toggle-text">
-              <span class="toggle-title">Set as recurring</span>
-              <span class="toggle-desc">Create a recurring fee for this client</span>
+        <div class="mb-4 px-5 py-5 bg-bg rounded-xl">
+          <label class="flex items-start gap-3.5 cursor-pointer">
+            <input type="checkbox" class="hidden" bind:checked={isRecurring} />
+            <div class="w-11 h-6 bg-border rounded-xl relative flex-shrink-0 transition-all duration-200 {isRecurring ? 'bg-primary' : ''}">
+              <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-200 {isRecurring ? 'translate-x-5' : ''}"></div>
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span class="font-semibold text-[0.9375rem]">Set as recurring</span>
+              <span class="text-[0.8125rem] text-text-secondary">Create a recurring fee for this client</span>
             </div>
           </label>
           {#if isRecurring}
-            <div class="recurring-select">
-              <select bind:value={recurringFrequency}>
+            <div class="mt-4 pt-4 border-t border-border-light max-w-[160px]">
+              <select class="w-full px-3 py-2 border border-border rounded-md text-sm" bind:value={recurringFrequency}>
                 <option value="monthly">Monthly</option>
                 <option value="yearly">Yearly</option>
               </select>
@@ -433,36 +436,37 @@
         </div>
 
         {#if partners.length >= 2}
-          <div class="form-section compact">
-            <h3>Revenue Split</h3>
-            <div class="split-control">
-              <div class="split-partner">
-                <span class="partner-name">{partners[0].name}</span>
-                <span class="partner-share">{partner_a_share}%</span>
+          <div class="mb-4 px-5 py-5 bg-bg rounded-xl">
+            <h3 class="text-[0.9375rem] font-semibold m-0 mb-4 text-text">Revenue Split</h3>
+            <div class="flex flex-col sm:flex-row items-center gap-6">
+              <div class="flex flex-col items-center min-w-[80px]">
+                <span class="text-xs text-text-secondary">{partners[0].name}</span>
+                <span class="text-xl font-bold">{partner_a_share}%</span>
               </div>
-              <div class="split-slider">
+              <div class="flex-1 relative w-full sm:w-auto">
                 <input
                   type="range"
+                  class="w-full h-1.5 opacity-0 relative z-10 cursor-pointer"
                   min="0"
                   max="100"
                   value={partner_a_share}
                   oninput={(e) => updateShareA(e.target.value)}
                 />
-                <div class="slider-track">
-                  <div class="slider-fill" style="width: {partner_a_share}%"></div>
+                <div class="absolute top-1/2 left-0 right-0 h-1.5 bg-border rounded-sm -translate-y-1/2">
+                  <div class="h-full bg-primary rounded-sm transition-all duration-100" style="width: {partner_a_share}%"></div>
                 </div>
               </div>
-              <div class="split-partner">
-                <span class="partner-name">{partners[1].name}</span>
-                <span class="partner-share">{partner_b_share}%</span>
+              <div class="flex flex-col items-center min-w-[80px]">
+                <span class="text-xs text-text-secondary">{partners[1].name}</span>
+                <span class="text-xl font-bold">{partner_b_share}%</span>
               </div>
             </div>
           </div>
         {/if}
 
-        <div class="form-actions">
-          <button type="button" class="btn-cancel" onclick={cancelForm}>Cancel</button>
-          <button type="submit" class="btn-submit">
+        <div class="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-border-light mt-2">
+          <button type="button" class="btn-cancel w-full sm:w-auto" onclick={cancelForm}>Cancel</button>
+          <button type="submit" class="px-6 py-2.5 bg-primary text-white border-none rounded-lg text-[0.9375rem] font-semibold cursor-pointer transition-all duration-200 hover:bg-primary-hover hover:-translate-y-px w-full sm:w-auto">
             {editing !== null ? "Update Invoice" : "Create Invoice"}
           </button>
         </div>
@@ -471,7 +475,7 @@
   {/if}
 
   {#if invoiceUrl}
-    <a href={invoiceUrl} target="_blank" class="download-banner">
+    <a href={invoiceUrl} target="_blank" class="flex items-center justify-center gap-2.5 px-4 py-4 mb-6 bg-gradient-to-br from-[#059669] to-[#10b981] text-white rounded-xl font-semibold no-underline transition-all duration-200 hover:-translate-y-0.5 hover:text-white animate-pulse-shadow">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
         <polyline points="7 10 12 15 17 10"/>
@@ -481,54 +485,54 @@
     </a>
   {/if}
 
-  <div class="invoices-list-container">
-    <div class="list-header">
-      <h2>All Invoices</h2>
-      <div class="filter-pills">
-        <button class:active={statusFilter === ""} onclick={() => statusFilter = ""}>
+  <div class="card overflow-hidden">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 py-5 border-b border-border-light gap-4">
+      <h2 class="text-lg font-semibold m-0">All Invoices</h2>
+      <div class="flex gap-1.5 w-full sm:w-auto overflow-x-auto">
+        <button class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[0.8125rem] font-medium cursor-pointer border-none transition-all duration-200 {statusFilter === '' ? 'bg-primary text-white' : 'bg-bg text-text-secondary hover:bg-border-light'}" onclick={() => statusFilter = ""}>
           All
-          <span class="pill-count">{invoices.length}</span>
+          <span class="px-1.5 py-0.5 rounded text-[0.6875rem] {statusFilter === '' ? 'bg-white/20' : 'bg-surface'}">{invoices.length}</span>
         </button>
-        <button class:active={statusFilter === "draft"} onclick={() => statusFilter = "draft"}>
+        <button class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[0.8125rem] font-medium cursor-pointer border-none transition-all duration-200 {statusFilter === 'draft' ? 'bg-primary text-white' : 'bg-bg text-text-secondary hover:bg-border-light'}" onclick={() => statusFilter = "draft"}>
           Draft
-          <span class="pill-count">{stats.draft}</span>
+          <span class="px-1.5 py-0.5 rounded text-[0.6875rem] {statusFilter === 'draft' ? 'bg-white/20' : 'bg-surface'}">{stats.draft}</span>
         </button>
-        <button class:active={statusFilter === "sent"} onclick={() => statusFilter = "sent"}>
+        <button class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[0.8125rem] font-medium cursor-pointer border-none transition-all duration-200 {statusFilter === 'sent' ? 'bg-primary text-white' : 'bg-bg text-text-secondary hover:bg-border-light'}" onclick={() => statusFilter = "sent"}>
           Sent
-          <span class="pill-count">{stats.sent}</span>
+          <span class="px-1.5 py-0.5 rounded text-[0.6875rem] {statusFilter === 'sent' ? 'bg-white/20' : 'bg-surface'}">{stats.sent}</span>
         </button>
-        <button class:active={statusFilter === "paid"} onclick={() => statusFilter = "paid"}>
+        <button class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[0.8125rem] font-medium cursor-pointer border-none transition-all duration-200 {statusFilter === 'paid' ? 'bg-primary text-white' : 'bg-bg text-text-secondary hover:bg-border-light'}" onclick={() => statusFilter = "paid"}>
           Paid
-          <span class="pill-count">{stats.paid}</span>
+          <span class="px-1.5 py-0.5 rounded text-[0.6875rem] {statusFilter === 'paid' ? 'bg-white/20' : 'bg-surface'}">{stats.paid}</span>
         </button>
       </div>
     </div>
 
     {#if filteredInvoices.length > 0}
-      <div class="invoice-cards">
+      <div class="p-4 flex flex-col gap-3">
         {#each filteredInvoices as inv, i}
-          <div class="invoice-card" style="animation-delay: {i * 40}ms">
-            <div class="card-main">
-              <div class="card-left">
-                <span class="invoice-number">#{inv.invoice_number || inv.id}</span>
-                <h4 class="invoice-title">{inv.title || `Invoice #${inv.invoice_number || inv.id}`}</h4>
+          <div class="bg-bg rounded-xl px-5 py-4 transition-all duration-200 hover:shadow-md hover:-translate-y-px animate-fade-in" style="animation-delay: {i * 40}ms">
+            <div class="flex flex-col sm:flex-row justify-between items-start mb-3 gap-3">
+              <div class="flex-1 min-w-0">
+                <span class="font-mono text-[0.6875rem] text-text-muted uppercase tracking-wide">#{inv.invoice_number || inv.id}</span>
+                <h4 class="text-base font-semibold my-1 whitespace-nowrap overflow-hidden text-ellipsis">{inv.title || `Invoice #${inv.invoice_number || inv.id}`}</h4>
                 {#if inv.description}
-                  <p class="invoice-desc">{inv.description}</p>
+                  <p class="text-[0.8125rem] text-text-secondary m-0 mb-2 whitespace-nowrap overflow-hidden text-ellipsis max-w-[400px]">{inv.description}</p>
                 {/if}
-                <div class="invoice-meta">
-                  <span class="meta-client">{getClientName(inv.client_id)}</span>
-                  <span class="meta-dot"></span>
-                  <span class="meta-date">{formatDate(inv.created_at)}</span>
+                <div class="flex items-center gap-2 text-[0.8125rem] text-text-secondary">
+                  <span>{getClientName(inv.client_id)}</span>
+                  <span class="w-0.5 h-0.5 bg-text-muted rounded-full"></span>
+                  <span>{formatDate(inv.created_at)}</span>
                 </div>
               </div>
-              <div class="card-right">
-                <span class="invoice-amount">{formatCurrency(inv.total_amount)}</span>
-                <span class="status-badge {inv.status || 'draft'}">{inv.status || 'draft'}</span>
+              <div class="flex sm:flex-col flex-row items-end sm:items-end gap-2 sm:gap-2 w-full sm:w-auto justify-between sm:justify-start text-right">
+                <span class="text-xl font-bold tracking-tight">{formatCurrency(inv.total_amount)}</span>
+                <span class="inline-block px-3 py-1 rounded-full text-[0.6875rem] font-semibold uppercase tracking-wide {(!inv.status || inv.status === 'draft') ? 'bg-bg text-text-secondary border border-border' : inv.status === 'sent' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}">{inv.status || 'draft'}</span>
               </div>
             </div>
-            <div class="card-actions">
+            <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-border-light">
               {#if inv.status === "draft" || !inv.status}
-                <button class="action-btn send" onclick={() => markAsSent(inv)}>
+                <button class="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 text-amber-700 border-none rounded-md text-[0.8125rem] font-medium cursor-pointer transition-all duration-150 hover:bg-amber-100" onclick={() => markAsSent(inv)}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="22" y1="2" x2="11" y2="13"/>
                     <polygon points="22 2 15 22 11 13 2 9 22 2"/>
@@ -536,14 +540,14 @@
                   Send
                 </button>
               {:else if inv.status === "sent"}
-                <button class="action-btn paid" onclick={() => markAsPaid(inv)}>
+                <button class="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 border-none rounded-md text-[0.8125rem] font-medium cursor-pointer transition-all duration-150 hover:bg-emerald-100" onclick={() => markAsPaid(inv)}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
                   Mark Paid
                 </button>
               {:else if inv.status === "paid"}
-                <button class="action-btn unsend" onclick={() => markAsSent(inv)}>
+                <button class="flex items-center gap-1.5 px-2.5 py-1.5 bg-bg text-text-secondary border-none rounded-md text-[0.8125rem] font-medium cursor-pointer transition-all duration-150 hover:bg-surface" onclick={() => markAsSent(inv)}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="1 4 1 10 7 10"/>
                     <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
@@ -551,19 +555,19 @@
                   Revert
                 </button>
               {/if}
-              <button class="action-btn" onclick={() => edit(inv)} title="Edit">
+              <button class="flex items-center gap-1.5 px-2.5 py-1.5 bg-transparent text-text-secondary border-none rounded-md text-[0.8125rem] font-medium cursor-pointer transition-all duration-150 hover:bg-surface hover:text-text" onclick={() => edit(inv)} title="Edit">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                 </svg>
               </button>
-              <a href={`http://localhost:8000/invoices/${inv.id}/pdf?t=${Date.now()}`} target="_blank" class="action-btn" title="Download PDF">
+              <a href={`http://localhost:8000/invoices/${inv.id}/pdf?t=${Date.now()}`} target="_blank" class="flex items-center gap-1.5 px-2.5 py-1.5 bg-transparent text-text-secondary border-none rounded-md text-[0.8125rem] font-medium cursor-pointer transition-all duration-150 hover:bg-surface hover:text-text no-underline" title="Download PDF">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                   <polyline points="14 2 14 8 20 8"/>
                 </svg>
               </a>
-              <button class="action-btn danger" onclick={() => remove(inv.id)} title="Delete">
+              <button class="flex items-center gap-1.5 px-2.5 py-1.5 bg-transparent text-text-secondary border-none rounded-md text-[0.8125rem] font-medium cursor-pointer transition-all duration-150 hover:bg-red-50 hover:text-red-500" onclick={() => remove(inv.id)} title="Delete">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3 6 5 6 21 6"/>
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -574,908 +578,16 @@
         {/each}
       </div>
     {:else}
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+      <div class="flex flex-col items-center justify-center py-16 px-8 text-center">
+        <div class="w-24 h-24 rounded-full bg-bg flex items-center justify-center mb-6">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="text-text-muted opacity-40">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
           </svg>
         </div>
-        <p>No invoices found</p>
-        <button class="btn-submit" onclick={() => showForm = true}>Create your first invoice</button>
+        <p class="text-text-secondary m-0 mb-6 text-base">No invoices found</p>
+        <button class="px-6 py-2.5 bg-primary text-white border-none rounded-lg text-[0.9375rem] font-semibold cursor-pointer transition-all duration-200 hover:bg-primary-hover hover:-translate-y-px" onclick={() => showForm = true}>Create your first invoice</button>
       </div>
     {/if}
   </div>
 </div>
-
-<style>
-  .invoices-page {
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-
-  .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1.5rem;
-  }
-
-  .page-header h1 {
-    font-size: 1.75rem;
-    font-weight: 700;
-    margin: 0;
-    letter-spacing: -0.03em;
-  }
-
-  .subtitle {
-    margin: 0.25rem 0 0;
-    color: var(--color-text-secondary);
-    font-size: 0.9375rem;
-  }
-
-  .btn-create {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1.25rem;
-    background: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .btn-create:hover {
-    background: var(--color-primary-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-  }
-
-  .stats-bar {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    padding: 1rem 1.5rem;
-    background: var(--color-surface);
-    border-radius: 14px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    margin-bottom: 1.5rem;
-  }
-
-  .stat-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-  }
-
-  .stat-item.featured {
-    margin-left: auto;
-  }
-
-  .stat-label {
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 500;
-  }
-
-  .stat-value {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--color-text);
-  }
-
-  .stat-value.muted { color: var(--color-text-secondary); }
-  .stat-value.warning { color: #d97706; }
-  .stat-value.success { color: #059669; }
-
-  .stat-divider {
-    width: 1px;
-    height: 32px;
-    background: var(--color-border-light);
-  }
-
-  .form-container {
-    background: var(--color-surface);
-    border-radius: 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
-    margin-bottom: 1.5rem;
-    overflow: hidden;
-    animation: slideDown 0.3s ease;
-    position: relative;
-  }
-
-  @keyframes slideDown {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .form-badge {
-    position: absolute;
-    top: 1.25rem;
-    right: 1.5rem;
-    background: var(--color-primary);
-    color: white;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    padding: 0.25rem 0.625rem;
-    border-radius: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .form-container form {
-    padding: 1.5rem;
-  }
-
-  .form-section {
-    margin-bottom: 1.5rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--color-border-light);
-  }
-
-  .form-section:last-of-type {
-    margin-bottom: 0;
-    padding-bottom: 0;
-    border-bottom: none;
-  }
-
-  .form-section.compact {
-    padding: 1.25rem;
-    background: var(--color-bg);
-    border-radius: 12px;
-    border-bottom: none;
-    margin-bottom: 1rem;
-  }
-
-  .form-section h3 {
-    font-size: 0.9375rem;
-    font-weight: 600;
-    margin: 0 0 1rem;
-    color: var(--color-text);
-  }
-
-  .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-  }
-
-  .section-header h3 {
-    margin: 0;
-  }
-
-  .form-row {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-
-  .form-row:last-child {
-    margin-bottom: 0;
-  }
-
-  .form-field {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-  }
-
-  .form-field.flex-2 {
-    flex: 2;
-  }
-
-  .form-field label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .form-field input,
-  .form-field select {
-    padding: 0.625rem 0.875rem;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    font-size: 0.9375rem;
-    background: white;
-    transition: all 0.2s ease;
-  }
-
-  .form-field input:focus,
-  .form-field select:focus {
-    outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  }
-
-  .btn-add-item {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.5rem 0.875rem;
-    background: transparent;
-    color: var(--color-primary);
-    border: 1px dashed var(--color-primary);
-    border-radius: 8px;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .btn-add-item:hover {
-    background: var(--color-primary-light);
-  }
-
-  .items-table {
-    background: var(--color-bg);
-    border-radius: 10px;
-    overflow: hidden;
-  }
-
-  .items-header {
-    display: grid;
-    grid-template-columns: 3fr 120px 80px 120px 40px;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    background: var(--color-surface);
-    border-bottom: 1px solid var(--color-border-light);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .item-row {
-    display: grid;
-    grid-template-columns: 3fr 120px 80px 120px 40px;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    align-items: center;
-    border-bottom: 1px solid var(--color-border-light);
-    animation: fadeIn 0.3s ease backwards;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .item-row:last-child {
-    border-bottom: none;
-  }
-
-  .item-row input {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--color-border-light);
-    border-radius: 6px;
-    font-size: 0.875rem;
-    background: white;
-  }
-
-  .item-row input:focus {
-    outline: none;
-    border-color: var(--color-primary);
-  }
-
-  .col-total span {
-    font-weight: 600;
-    color: var(--color-text-secondary);
-  }
-
-  .btn-remove {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    border-radius: 6px;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    transition: all 0.15s ease;
-  }
-
-  .btn-remove:hover {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-  }
-
-  .items-footer {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 2rem;
-    padding: 1rem;
-    background: var(--color-surface);
-    border-top: 1px solid var(--color-border-light);
-  }
-
-  .items-total-label {
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
-    font-weight: 500;
-  }
-
-  .items-total-value {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: var(--color-text);
-  }
-
-  .toggle-control {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.875rem;
-    cursor: pointer;
-  }
-
-  .toggle-control input {
-    display: none;
-  }
-
-  .toggle-switch {
-    width: 44px;
-    height: 24px;
-    background: var(--color-border);
-    border-radius: 12px;
-    position: relative;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-  }
-
-  .toggle-switch::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 20px;
-    height: 20px;
-    background: white;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-  }
-
-  .toggle-control input:checked + .toggle-switch {
-    background: var(--color-primary);
-  }
-
-  .toggle-control input:checked + .toggle-switch::after {
-    left: 22px;
-  }
-
-  .toggle-text {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-  }
-
-  .toggle-title {
-    font-weight: 600;
-    font-size: 0.9375rem;
-  }
-
-  .toggle-desc {
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
-  }
-
-  .recurring-select {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--color-border-light);
-    max-width: 160px;
-  }
-
-  .recurring-select select {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    font-size: 0.875rem;
-  }
-
-  .split-control {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-  }
-
-  .split-partner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 80px;
-  }
-
-  .partner-name {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-  }
-
-  .partner-share {
-    font-size: 1.25rem;
-    font-weight: 700;
-  }
-
-  .split-slider {
-    flex: 1;
-    position: relative;
-  }
-
-  .split-slider input {
-    width: 100%;
-    height: 6px;
-    opacity: 0;
-    position: relative;
-    z-index: 2;
-    cursor: pointer;
-  }
-
-  .slider-track {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    height: 6px;
-    background: var(--color-border);
-    border-radius: 3px;
-    transform: translateY(-50%);
-  }
-
-  .slider-fill {
-    height: 100%;
-    background: var(--color-primary);
-    border-radius: 3px;
-    transition: width 0.1s ease;
-  }
-
-  .form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--color-border-light);
-    margin-top: 0.5rem;
-  }
-
-  .btn-cancel {
-    padding: 0.625rem 1.25rem;
-    background: white;
-    color: var(--color-text-secondary);
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    font-size: 0.9375rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .btn-cancel:hover {
-    background: var(--color-bg);
-  }
-
-  .btn-submit {
-    padding: 0.625rem 1.5rem;
-    background: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .btn-submit:hover {
-    background: var(--color-primary-hover);
-    transform: translateY(-1px);
-  }
-
-  .download-banner {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.625rem;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-    color: white;
-    border-radius: 12px;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all 0.2s ease;
-    animation: pulse 2s ease infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-    50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-  }
-
-  .download-banner:hover {
-    transform: translateY(-2px);
-    text-decoration: none;
-    color: white;
-  }
-
-  .invoices-list-container {
-    background: var(--color-surface);
-    border-radius: 16px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
-    overflow: hidden;
-  }
-
-  .list-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.25rem 1.5rem;
-    border-bottom: 1px solid var(--color-border-light);
-  }
-
-  .list-header h2 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin: 0;
-  }
-
-  .filter-pills {
-    display: flex;
-    gap: 0.375rem;
-  }
-
-  .filter-pills button {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.5rem 0.875rem;
-    background: var(--color-bg);
-    color: var(--color-text-secondary);
-    border: none;
-    border-radius: 8px;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .filter-pills button:hover {
-    background: var(--color-border-light);
-  }
-
-  .filter-pills button.active {
-    background: var(--color-primary);
-    color: white;
-  }
-
-  .pill-count {
-    background: rgba(255,255,255,0.2);
-    padding: 0.125rem 0.375rem;
-    border-radius: 4px;
-    font-size: 0.6875rem;
-  }
-
-  .filter-pills button:not(.active) .pill-count {
-    background: var(--color-surface);
-  }
-
-  .invoice-cards {
-    padding: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .invoice-card {
-    background: var(--color-bg);
-    border-radius: 12px;
-    padding: 1rem 1.25rem;
-    transition: all 0.2s ease;
-    animation: fadeIn 0.4s ease backwards;
-  }
-
-  .invoice-card:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    transform: translateY(-1px);
-  }
-
-  .card-main {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 0.75rem;
-  }
-
-  .card-left {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .invoice-number {
-    font-family: ui-monospace, monospace;
-    font-size: 0.6875rem;
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .invoice-title {
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0.25rem 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .invoice-desc {
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
-    margin: 0 0 0.5rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 400px;
-  }
-
-  .invoice-meta {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8125rem;
-    color: var(--color-text-secondary);
-  }
-
-  .meta-dot {
-    width: 3px;
-    height: 3px;
-    background: var(--color-text-muted);
-    border-radius: 50%;
-  }
-
-  .card-right {
-    text-align: right;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.5rem;
-  }
-
-  .invoice-amount {
-    font-size: 1.25rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-
-  .status-badge {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-  }
-
-  .status-badge.draft {
-    background: var(--color-bg);
-    color: var(--color-text-secondary);
-    border: 1px solid var(--color-border);
-  }
-
-  .status-badge.sent {
-    background: rgba(245, 158, 11, 0.1);
-    color: #d97706;
-  }
-
-  .status-badge.paid {
-    background: rgba(16, 185, 129, 0.1);
-    color: #059669;
-  }
-
-  .card-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--color-border-light);
-  }
-
-  .action-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.375rem 0.625rem;
-    background: transparent;
-    border: none;
-    border-radius: 6px;
-    color: var(--color-text-secondary);
-    font-size: 0.8125rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    text-decoration: none;
-  }
-
-  .action-btn:hover {
-    background: var(--color-surface);
-    color: var(--color-text);
-  }
-
-  .action-btn.send {
-    background: rgba(245, 158, 11, 0.1);
-    color: #d97706;
-  }
-
-  .action-btn.send:hover {
-    background: rgba(245, 158, 11, 0.2);
-  }
-
-  .action-btn.paid {
-    background: rgba(16, 185, 129, 0.1);
-    color: #059669;
-  }
-
-  .action-btn.paid:hover {
-    background: rgba(16, 185, 129, 0.2);
-  }
-
-  .action-btn.unsend {
-    background: var(--color-bg);
-    color: var(--color-text-secondary);
-  }
-
-  .action-btn.danger:hover {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-  }
-
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem 2rem;
-    text-align: center;
-  }
-
-  .empty-icon {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    background: var(--color-bg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 1.5rem;
-  }
-
-  .empty-icon svg {
-    color: var(--color-text-muted);
-    opacity: 0.4;
-  }
-
-  .empty-state p {
-    color: var(--color-text-secondary);
-    margin: 0 0 1.5rem;
-    font-size: 1rem;
-  }
-
-  @media (max-width: 900px) {
-    .stats-bar {
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .stat-divider {
-      display: none;
-    }
-
-    .stat-item.featured {
-      margin-left: 0;
-      width: 100%;
-      padding-top: 0.75rem;
-      border-top: 1px solid var(--color-border-light);
-    }
-
-    .form-row {
-      flex-direction: column;
-    }
-
-    .items-header {
-      display: none;
-    }
-
-    .item-row {
-      grid-template-columns: 1fr;
-      gap: 0.5rem;
-      padding: 1rem;
-    }
-
-    .col-total {
-      text-align: left;
-      padding-top: 0.5rem;
-      border-top: 1px solid var(--color-border-light);
-    }
-
-    .col-action {
-      position: absolute;
-      top: 0.5rem;
-      right: 0.5rem;
-    }
-
-    .item-row {
-      position: relative;
-    }
-
-    .list-header {
-      flex-direction: column;
-      gap: 1rem;
-      align-items: flex-start;
-    }
-
-    .filter-pills {
-      width: 100%;
-      overflow-x: auto;
-    }
-
-    .card-main {
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .card-right {
-      flex-direction: row;
-      align-items: center;
-      gap: 1rem;
-      width: 100%;
-      justify-content: space-between;
-    }
-
-    .split-control {
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .split-slider {
-      width: 100%;
-    }
-  }
-
-  @media (max-width: 640px) {
-    .page-header {
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .btn-create {
-      width: 100%;
-      justify-content: center;
-    }
-
-    .form-actions {
-      flex-direction: column;
-    }
-
-    .form-actions button {
-      width: 100%;
-    }
-
-    .card-actions {
-      flex-wrap: wrap;
-    }
-  }
-</style>
