@@ -4,6 +4,7 @@ backend/.venv
 backend/__pycache__
 backend/results
 backend/templates/
+backend/qr.jpg
 
 frontend/.svelte-kit
 frontend/node_modules/
