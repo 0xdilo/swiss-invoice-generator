@@ -287,6 +287,11 @@ def to_swiss_date(date_str):
         pass
     return date_str
 
+def format_swiss_amount(value):
+    """Format a number with Swiss-style thousands separator (apostrophe). E.g. 14375.00 -> 14'375.00"""
+    formatted = f"{float(value):,.2f}"
+    return formatted.replace(",", "'")
+
 @app.get("/clients")
 def get_clients():
     with db() as conn:
@@ -1005,18 +1010,18 @@ async def create_invoice(
 
         for item in items:
             item["total"] = float(item["price"]) * float(item["qty"])
-            item["price"] = f"{float(item['price']):.2f}"
-            item["total"] = f"{item['total']:.2f}"
+            item["price"] = format_swiss_amount(item['price'])
+            item["total"] = format_swiss_amount(item['total'])
 
-        subtotal = sum(float(item["total"]) for item in items)
-        net_total = subtotal  
-        subtotal = f"{subtotal:.2f}"
-        net_total = f"{net_total:.2f}"
+        subtotal_raw = sum(float(str(item["total"]).replace("'", "")) for item in items)
+        net_total_raw = subtotal_raw
+        subtotal = format_swiss_amount(subtotal_raw)
+        net_total = format_swiss_amount(net_total_raw)
 
         debtor = {
             "name": client_dict["name"],
             "street": client_dict["address"],
-            "pcode": client_dict["cap"], 
+            "pcode": client_dict["cap"],
             "city": client_dict["city"],
             "country": client_dict["country"]
         }
@@ -1028,7 +1033,7 @@ async def create_invoice(
         qr_svg_path = None
         qr_svg_rel_path = ""
         try:
-            qr_svg_path = generate_qr_bill_svg(net_total, debtor, additional_info, bank_details, invoice_dir)
+            qr_svg_path = generate_qr_bill_svg(net_total_raw, debtor, additional_info, bank_details, invoice_dir)
             qr_svg_rel_path = os.path.basename(qr_svg_path)  
         except Exception as e:
             print(f"QR-bill generation failed for invoice {invoice_id}: {e}")
@@ -1165,19 +1170,19 @@ async def update_invoice(
         # Calculate totals
         for item in items:
             item["total"] = float(item["price"]) * float(item["qty"])
-            item["price"] = f"{float(item['price']):.2f}"
-            item["total"] = f"{item['total']:.2f}"
+            item["price"] = format_swiss_amount(item['price'])
+            item["total"] = format_swiss_amount(item['total'])
 
-        subtotal = sum(float(item["total"]) for item in items)
-        net_total = subtotal  
-        subtotal = f"{subtotal:.2f}"
-        net_total = f"{net_total:.2f}"
+        subtotal_raw = sum(float(str(item["total"]).replace("'", "")) for item in items)
+        net_total_raw = subtotal_raw
+        subtotal = format_swiss_amount(subtotal_raw)
+        net_total = format_swiss_amount(net_total_raw)
 
         # Prepare QR bill data
         debtor = {
             "name": client_dict["name"],
             "street": client_dict["address"],
-            "pcode": client_dict["cap"], 
+            "pcode": client_dict["cap"],
             "city": client_dict["city"],
             "country": client_dict["country"]
         }
@@ -1190,7 +1195,7 @@ async def update_invoice(
         qr_svg_path = None
         qr_svg_rel_path = ""
         try:
-            qr_svg_path = generate_qr_bill_svg(net_total, debtor, additional_info, bank_details, invoice_dir)
+            qr_svg_path = generate_qr_bill_svg(net_total_raw, debtor, additional_info, bank_details, invoice_dir)
             qr_svg_rel_path = os.path.basename(qr_svg_path)  
         except Exception as e:
             print(f"QR-bill generation failed for invoice {invoice_id}: {e}")
