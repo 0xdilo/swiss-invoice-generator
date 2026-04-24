@@ -110,6 +110,20 @@
           </svg>
           <span class="lg:hidden max-sm:block">Expenses</span>
         </a>
+        <a href="/recurring"
+           class="flex items-center gap-3 px-5 py-2.5 mx-2 my-0.5 rounded-lg text-[15px] font-medium text-white/65 transition-all duration-150
+                  hover:bg-sidebar-hover hover:text-text-inverse
+                  lg:justify-center lg:px-3 lg:py-3 lg:mx-2 lg:my-1
+                  max-sm:flex-col max-sm:p-2 max-sm:m-0 max-sm:text-[10px] max-sm:gap-1
+                  {$page.url.pathname === '/recurring' ? 'bg-sidebar-active text-text-inverse' : ''}">
+          <svg class="opacity-70 flex-shrink-0 max-sm:w-[22px] max-sm:h-[22px] {$page.url.pathname === '/recurring' ? 'opacity-100' : ''}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 2.1l4 4-4 4"/>
+            <path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/>
+            <path d="M7 21.9l-4-4 4-4"/>
+            <path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/>
+          </svg>
+          <span class="lg:hidden max-sm:block">Recurring</span>
+        </a>
       </div>
     </nav>
 

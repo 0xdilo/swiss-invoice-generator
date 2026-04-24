@@ -12,6 +12,7 @@
     addRecurringFee,
   } from "$lib/api.js";
   import { onMount } from "svelte";
+  import { page } from "$app/stores";
   let clients = [],
     templates = [],
     invoices = [],
@@ -59,7 +60,15 @@
       partner_b_share = partners[1].default_share;
     }
   }
-  onMount(load);
+
+  onMount(async () => {
+    await load();
+    const editId = $page.url.searchParams.get("edit");
+    if (editId) {
+      const inv = invoices.find((i) => String(i.id) === editId);
+      if (inv) edit(inv);
+    }
+  });
 
   $: filteredInvoices = statusFilter
     ? invoices.filter(inv => inv.status === statusFilter)

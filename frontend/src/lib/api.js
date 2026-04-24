@@ -24,6 +24,9 @@ export async function deleteClient(id) {
 export async function getRecurringFees(clientId) {
   return fetch(`${API}/clients/${clientId}/recurring-fees`).then(r => r.json());
 }
+export async function getAllRecurringFees() {
+  return fetch(`${API}/recurring-fees`).then(r => r.json());
+}
 export async function addRecurringFee(clientId, fee) {
   return fetch(`${API}/clients/${clientId}/recurring-fees`, {
     method: "POST",
@@ -266,6 +269,30 @@ export async function checkTelegramNotifications() {
 
 export async function generateInvoiceFromRecurring(feeId) {
   return fetch(`${API}/recurring-fees/${feeId}/generate-invoice`, { method: "POST" }).then(r => r.json());
+}
+
+export async function getRecurringExpenses() {
+  return fetch(`${API}/recurring-expenses`).then(r => r.json());
+}
+export async function addRecurringExpense(expense) {
+  return fetch(`${API}/recurring-expenses`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(expense)
+  }).then(r => r.json());
+}
+export async function updateRecurringExpense(id, expense) {
+  return fetch(`${API}/recurring-expenses/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(expense)
+  }).then(r => r.json());
+}
+export async function deleteRecurringExpense(id) {
+  return fetch(`${API}/recurring-expenses/${id}`, { method: "DELETE" }).then(r => r.json());
+}
+export async function generateExpenseFromRecurring(id) {
+  return fetch(`${API}/recurring-expenses/${id}/generate-expense`, { method: "POST" }).then(r => r.json());
 }
 
 export async function getTodos(filters = {}) {

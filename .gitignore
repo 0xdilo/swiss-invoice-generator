@@ -1,10 +1,15 @@
 backend/target
 backend/db.sqlite
+backend/db.sqlite.backup-*
 backend/.venv
 backend/__pycache__
 backend/results
 backend/templates/
 backend/qr.jpg
+
+db.sqlite
+*.sqlite.backup-*
+.playwright-mcp/
 
 frontend/.svelte-kit
 frontend/node_modules/

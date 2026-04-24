@@ -1,6 +1,6 @@
 <script>
   import { onMount } from "svelte";
-  import { getExpenses, createExpense, updateExpense, deleteExpense, getExpenseBalance, getPartners, createSettlement, getSettlements } from "$lib/api.js";
+  import { getExpenses, createExpense, updateExpense, deleteExpense, getExpenseBalance, getPartners, createSettlement, getSettlements, addRecurringExpense } from "$lib/api.js";
 
   let expenses = [];
   let partners = [];
@@ -19,7 +19,9 @@
     paid_by: null,
     split_ratio_a: 50,
     split_ratio_b: 50,
-    notes: ""
+    notes: "",
+    is_recurring: false,
+    frequency: "monthly"
   };
 
   let filters = {
@@ -77,7 +79,9 @@
       paid_by: partners[0]?.id || null,
       split_ratio_a: partners[0]?.default_share || 50,
       split_ratio_b: partners[1]?.default_share || 50,
-      notes: ""
+      notes: "",
+      is_recurring: false,
+      frequency: "monthly"
     };
     showForm = true;
   }
@@ -100,15 +104,28 @@
   }
 
   async function submitForm() {
-    const data = {
-      ...form,
-      amount: parseFloat(form.amount)
-    };
+    const { is_recurring, frequency, ...rest } = form;
+    const data = { ...rest, amount: parseFloat(form.amount) };
 
     if (editingId) {
       await updateExpense(editingId, data);
     } else {
       await createExpense(data);
+      if (is_recurring) {
+        await addRecurringExpense({
+          description: data.description,
+          amount: data.amount,
+          currency: data.currency,
+          frequency,
+          start_date: data.date,
+          category: data.category,
+          expense_type: data.expense_type,
+          paid_by: data.paid_by,
+          split_ratio_a: data.split_ratio_a,
+          split_ratio_b: data.split_ratio_b,
+          notes: data.notes
+        });
+      }
     }
 
     showForm = false;
@@ -424,6 +441,24 @@
           <label class="form-label">Notes (optional)</label>
           <textarea bind:value={form.notes} placeholder="Additional notes..." class="form-input min-h-[80px] resize-y"></textarea>
         </div>
+
+        {#if !editingId}
+          <div class="mb-4 p-3 bg-bg border border-border rounded-lg">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" bind:checked={form.is_recurring} class="w-4 h-4" />
+              <span class="font-medium">Set as recurring</span>
+            </label>
+            {#if form.is_recurring}
+              <div class="mt-3">
+                <label class="form-label">Frequency</label>
+                <select bind:value={form.frequency} class="form-input">
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+            {/if}
+          </div>
+        {/if}
 
         <div class="modal-footer max-sm:flex-col">
           <button type="button" class="btn-cancel max-sm:w-full" onclick={() => showForm = false}>Cancel</button>

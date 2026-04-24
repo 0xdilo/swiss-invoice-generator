@@ -6,7 +6,9 @@ import base64
 import io
 import shutil
 import secrets
+from datetime import datetime
 from decimal import Decimal
+from dateutil.relativedelta import relativedelta
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -102,6 +104,22 @@ def init_db():
             status TEXT DEFAULT 'pending',
             notes TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (paid_by) REFERENCES partners(id)
+        )''')
+
+        c.execute('''CREATE TABLE IF NOT EXISTS recurring_expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            description TEXT,
+            amount REAL,
+            currency TEXT DEFAULT 'CHF',
+            frequency TEXT,
+            start_date TEXT,
+            category TEXT DEFAULT 'other',
+            expense_type TEXT DEFAULT 'business',
+            paid_by INTEGER,
+            split_ratio_a REAL DEFAULT 50.0,
+            split_ratio_b REAL DEFAULT 50.0,
+            notes TEXT,
             FOREIGN KEY (paid_by) REFERENCES partners(id)
         )''')
 
@@ -218,6 +236,8 @@ def init_db():
         rf_columns = [col[1] for col in c.fetchall()]
         if "service_type" not in rf_columns:
             c.execute("ALTER TABLE recurring_fees ADD COLUMN service_type TEXT DEFAULT 'other'")
+        if "items" not in rf_columns:
+            c.execute("ALTER TABLE recurring_fees ADD COLUMN items TEXT")
 
         conn.commit()
 
@@ -361,6 +381,54 @@ def get_client_stats(client_id: int):
             "annual_recurring": annual_recurring
         }
 
+@app.get("/recurring-fees")
+def get_all_recurring_fees():
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("""
+            SELECT rf.*, c.name as client_name
+            FROM recurring_fees rf
+            LEFT JOIN clients c ON rf.client_id = c.id
+            ORDER BY c.name, rf.description
+        """)
+        rows = c.fetchall()
+        fees = [dict(zip([col[0] for col in c.description], row)) for row in rows]
+
+        today = datetime.now()
+        for fee in fees:
+            start_date_str = fee.get("start_date", "")
+            try:
+                if "." in start_date_str:
+                    parts = start_date_str.split(".")
+                    start_date = datetime(int(parts[2]), int(parts[1]), int(parts[0]))
+                elif "/" in start_date_str:
+                    parts = start_date_str.split("/")
+                    start_date = datetime(int(parts[2]), int(parts[1]), int(parts[0]))
+                else:
+                    start_date = datetime.fromisoformat(start_date_str[:10])
+
+                next_due = start_date
+                if fee["frequency"] == "monthly":
+                    while next_due < today:
+                        next_due = next_due + relativedelta(months=1)
+                elif fee["frequency"] == "yearly":
+                    while next_due < today:
+                        next_due = next_due + relativedelta(years=1)
+                fee["next_due_date"] = next_due.strftime("%Y-%m-%d")
+            except:
+                fee["next_due_date"] = None
+
+            c.execute("""
+                SELECT i.id, i.invoice_number, i.total_amount, i.status, pe.due_date
+                FROM payment_events pe
+                JOIN invoices i ON pe.invoice_id = i.id
+                WHERE pe.recurring_fee_id = ?
+                ORDER BY pe.due_date DESC, i.id DESC
+            """, (fee["id"],))
+            fee["invoices"] = [dict(zip([col[0] for col in c.description], row)) for row in c.fetchall()]
+
+        return fees
+
 @app.get("/clients/{client_id}/recurring-fees")
 def get_recurring_fees(client_id: int):
     with db() as conn:
@@ -469,6 +537,99 @@ def delete_recurring_fee(fee_id: int):
         c.execute("DELETE FROM recurring_fees WHERE id=?", (fee_id,))
         conn.commit()
         return {"ok": True}
+
+def _next_due(start_date_str, frequency):
+    try:
+        if "." in start_date_str:
+            parts = start_date_str.split(".")
+            start_date = datetime(int(parts[2]), int(parts[1]), int(parts[0]))
+        elif "/" in start_date_str:
+            parts = start_date_str.split("/")
+            start_date = datetime(int(parts[2]), int(parts[1]), int(parts[0]))
+        else:
+            start_date = datetime.fromisoformat(start_date_str[:10])
+    except:
+        return None
+    today = datetime.now()
+    next_due = start_date
+    if frequency == "monthly":
+        while next_due < today:
+            next_due = next_due + relativedelta(months=1)
+    elif frequency == "yearly":
+        while next_due < today:
+            next_due = next_due + relativedelta(years=1)
+    return next_due.strftime("%Y-%m-%d")
+
+@app.get("/recurring-expenses")
+def get_all_recurring_expenses():
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM recurring_expenses ORDER BY description")
+        rows = c.fetchall()
+        items = [dict(zip([col[0] for col in c.description], row)) for row in rows]
+        for it in items:
+            it["next_due_date"] = _next_due(it.get("start_date", ""), it.get("frequency", ""))
+        return items
+
+@app.post("/recurring-expenses")
+def add_recurring_expense(expense: dict = Body(...)):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute(
+            """INSERT INTO recurring_expenses (description, amount, currency, frequency, start_date, category, expense_type, paid_by, split_ratio_a, split_ratio_b, notes)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (expense.get("description", ""), expense["amount"], expense.get("currency", "CHF"),
+             expense["frequency"], expense["start_date"],
+             expense.get("category", "other"), expense.get("expense_type", "business"),
+             expense.get("paid_by"), expense.get("split_ratio_a", 50.0),
+             expense.get("split_ratio_b", 50.0), expense.get("notes"))
+        )
+        conn.commit()
+        return {"id": c.lastrowid}
+
+@app.put("/recurring-expenses/{expense_id}")
+def update_recurring_expense(expense_id: int, expense: dict = Body(...)):
+    with db() as conn:
+        c = conn.cursor()
+        updates = []
+        params = []
+        for field in ["description", "amount", "currency", "frequency", "start_date", "category", "expense_type", "paid_by", "split_ratio_a", "split_ratio_b", "notes"]:
+            if field in expense:
+                updates.append(f"{field}=?")
+                params.append(expense[field])
+        if not updates:
+            return {"ok": True}
+        params.append(expense_id)
+        c.execute(f"UPDATE recurring_expenses SET {', '.join(updates)} WHERE id=?", params)
+        conn.commit()
+        return {"ok": True}
+
+@app.delete("/recurring-expenses/{expense_id}")
+def delete_recurring_expense(expense_id: int):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM recurring_expenses WHERE id=?", (expense_id,))
+        conn.commit()
+        return {"ok": True}
+
+@app.post("/recurring-expenses/{expense_id}/generate-expense")
+def generate_expense_from_recurring(expense_id: int):
+    with db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM recurring_expenses WHERE id=?", (expense_id,))
+        row = c.fetchone()
+        if not row:
+            raise HTTPException(404, "Recurring expense not found")
+        rec = dict(zip([col[0] for col in c.description], row))
+        today = datetime.now().strftime("%Y-%m-%d")
+        c.execute(
+            """INSERT INTO expenses (date, description, amount, currency, category, expense_type, paid_by, split_ratio_a, split_ratio_b, notes)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (today, rec["description"], rec["amount"], rec["currency"], rec["category"],
+             rec["expense_type"], rec["paid_by"], rec["split_ratio_a"], rec["split_ratio_b"], rec.get("notes"))
+        )
+        conn.commit()
+        return {"expense_id": c.lastrowid}
 
 @app.get("/bank-details")
 def get_bank_details():
@@ -1756,6 +1917,124 @@ async def check_and_send_notifications():
         conn.commit()
         return {"sent": sent_count}
 
+def _render_invoice_pdf(conn, invoice_id, source_logo_dir=None):
+    c = conn.cursor()
+    c.execute("SELECT invoice_number, client_id, template_id, data FROM invoices WHERE id=?", (invoice_id,))
+    row = c.fetchone()
+    if not row:
+        raise HTTPException(404, "Invoice not found")
+    invoice_number, client_id, template_id, data_str = row
+    invoice_data = json.loads(data_str)
+    items = [dict(it) for it in invoice_data.get("items", [])]
+
+    c.execute("SELECT template_dir, html_filename, css_filename FROM templates WHERE id=?", (template_id,))
+    tpl = c.fetchone()
+    if not tpl:
+        raise HTTPException(404, "Template not found")
+    template_dir_name, html_filename, css_filename = tpl
+    template_dir_path = os.path.join(TEMPLATE_DIR, template_dir_name)
+    css_path = os.path.join(template_dir_path, css_filename)
+
+    c.execute("SELECT * FROM clients WHERE id=?", (client_id,))
+    client_row = c.fetchone()
+    client_dict = dict(zip([col[0] for col in c.description], client_row))
+    client_dict["zip"] = client_dict["cap"]
+    client_dict["formatted_city"] = f"{client_dict['city']}, {client_dict['cap']}"
+    client_dict["country"] = client_dict.get("nation") or "CH"
+
+    c.execute("SELECT * FROM bank_details LIMIT 1")
+    bank_row = c.fetchone()
+    bank_details = dict(zip([col[0] for col in c.description], bank_row))
+
+    for item in items:
+        item["total"] = float(item["price"]) * float(item["qty"])
+        item["price"] = format_swiss_amount(item["price"])
+        item["total"] = format_swiss_amount(item["total"])
+
+    subtotal_raw = sum(float(str(item["total"]).replace("'", "")) for item in items)
+    subtotal = format_swiss_amount(subtotal_raw)
+    net_total = format_swiss_amount(subtotal_raw)
+
+    debtor = {
+        "name": client_dict["name"],
+        "street": client_dict["address"],
+        "pcode": client_dict["cap"],
+        "city": client_dict["city"],
+        "country": client_dict["country"]
+    }
+    additional_info = invoice_data.get("notes", "")
+
+    invoice_dir = os.path.join("results", f"invoice_{invoice_id}")
+    os.makedirs(invoice_dir, exist_ok=True)
+
+    if source_logo_dir and os.path.isdir(source_logo_dir):
+        for fname in os.listdir(source_logo_dir):
+            if fname.startswith("uploaded_logo."):
+                shutil.copy(os.path.join(source_logo_dir, fname), os.path.join(invoice_dir, fname))
+                break
+
+    logo_rel_path = None
+    for fname in os.listdir(invoice_dir):
+        if fname.startswith("uploaded_logo."):
+            logo_rel_path = fname
+            break
+
+    qr_svg_rel_path = ""
+    try:
+        qr_svg_path = generate_qr_bill_svg(subtotal_raw, debtor, additional_info, bank_details, invoice_dir)
+        qr_svg_rel_path = os.path.basename(qr_svg_path)
+    except Exception as e:
+        print(f"QR-bill generation failed for invoice {invoice_id}: {e}")
+
+    invoice_date_raw = invoice_data.get("date") or ""
+    invoice_date = to_swiss_date(invoice_date_raw)
+
+    invoice_data_copy = dict(invoice_data)
+    for k in ["date", "invoice_date", "items"]:
+        invoice_data_copy.pop(k, None)
+
+    context = {
+        "client": client_dict,
+        "customer": client_dict.copy(),
+        "qr_image": qr_svg_rel_path,
+        "items": items,
+        "subtotal": subtotal,
+        "net_total": net_total,
+        "total": net_total,
+        "invoice_number": invoice_number,
+        "invoice_date": invoice_date,
+        "date": invoice_date,
+        "logo": logo_rel_path,
+        **invoice_data_copy
+    }
+
+    shutil.copy(css_path, os.path.join(invoice_dir, css_filename))
+    for asset in ["logo.png", "qr.png"]:
+        asset_path = os.path.join(template_dir_path, asset)
+        copy_asset_if_exists(asset_path, invoice_dir)
+
+    env = Environment(loader=FileSystemLoader(template_dir_path))
+    template = env.get_template(html_filename)
+    html_content_rendered = template.render(**context)
+
+    if qr_svg_rel_path and os.path.exists(os.path.join(invoice_dir, qr_svg_rel_path)):
+        html_content_rendered = re.sub(r'\{\{\s*qr_image\s*\}\}',
+                                       f'<img src="{qr_svg_rel_path}" alt="QR Bill" />',
+                                       html_content_rendered)
+    if logo_rel_path and os.path.exists(os.path.join(invoice_dir, logo_rel_path)):
+        html_content_rendered = re.sub(r'\{\{\s*logo\s*\}\}',
+                                       f'<img src="{logo_rel_path}" alt="Company Logo" style="max-height:100px; width:auto;" />',
+                                       html_content_rendered)
+
+    rendered_html_path = os.path.join(invoice_dir, "rendered.html")
+    with open(rendered_html_path, "w", encoding="utf-8") as f:
+        f.write(html_content_rendered)
+
+    pdf_path = os.path.join(invoice_dir, "invoice.pdf")
+    HTML(filename=rendered_html_path, base_url=f"file://{os.path.abspath(invoice_dir)}/").write_pdf(pdf_path)
+    return pdf_path
+
+
 @app.post("/recurring-fees/{fee_id}/generate-invoice")
 def generate_invoice_from_recurring(fee_id: int):
     with db() as conn:
@@ -1766,27 +2045,56 @@ def generate_invoice_from_recurring(fee_id: int):
             raise HTTPException(404, "Recurring fee not found")
         fee = dict(zip([col[0] for col in c.description], fee_row))
 
-        c.execute("SELECT id FROM templates LIMIT 1")
-        template_row = c.fetchone()
-        if not template_row:
-            raise HTTPException(400, "No templates available")
-        template_id = template_row[0]
-
-        c.execute("SELECT id FROM partners ORDER BY id LIMIT 2")
-        partners = c.fetchall()
-        partner_a_share = 50.0
-        partner_b_share = 50.0
-        if len(partners) >= 2:
-            c.execute("SELECT default_share FROM partners WHERE id=?", (partners[0][0],))
-            partner_a_share = c.fetchone()[0]
-            partner_b_share = 100.0 - partner_a_share
+        c.execute("""
+            SELECT i.id, i.template_id, i.data, i.partner_a_share, i.partner_b_share
+            FROM payment_events pe
+            JOIN invoices i ON pe.invoice_id = i.id
+            WHERE pe.recurring_fee_id = ?
+            ORDER BY pe.due_date DESC, i.id DESC
+            LIMIT 1
+        """, (fee_id,))
+        prev = c.fetchone()
 
         from datetime import datetime
-        invoice_data = json.dumps({
-            "items": [{"desc": fee["description"] or "Service", "price": fee["amount"], "qty": 1}],
-            "date": datetime.now().strftime("%d.%m.%Y"),
-            "notes": ""
-        })
+        try:
+            fee_items = json.loads(fee.get("items") or "null")
+        except:
+            fee_items = None
+        if not fee_items:
+            fee_items = [{"desc": fee["description"] or "Service", "price": fee["amount"], "qty": 1}]
+
+        prev_invoice_id = None
+        if prev:
+            prev_invoice_id, template_id, prev_data, partner_a_share, partner_b_share = prev
+            try:
+                data_obj = json.loads(prev_data)
+            except:
+                data_obj = {}
+            data_obj["items"] = fee_items
+            data_obj["date"] = datetime.now().strftime("%Y-%m-%d")
+            data_obj["invoice_date"] = datetime.now().strftime("%Y-%m-%d")
+            invoice_data = json.dumps(data_obj)
+        else:
+            c.execute("SELECT id FROM templates LIMIT 1")
+            template_row = c.fetchone()
+            if not template_row:
+                raise HTTPException(400, "No templates available")
+            template_id = template_row[0]
+
+            c.execute("SELECT id, default_share FROM partners ORDER BY id LIMIT 2")
+            partners = c.fetchall()
+            partner_a_share = 50.0
+            partner_b_share = 50.0
+            if len(partners) >= 2:
+                partner_a_share = partners[0][1]
+                partner_b_share = 100.0 - partner_a_share
+
+            invoice_data = json.dumps({
+                "items": fee_items,
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "invoice_date": datetime.now().strftime("%Y-%m-%d"),
+                "notes": ""
+            })
 
         while True:
             invoice_number = generate_invoice_number()
@@ -1804,7 +2112,7 @@ def generate_invoice_from_recurring(fee_id: int):
 
         c.execute("""
             SELECT id FROM payment_events
-            WHERE recurring_fee_id=? AND status IN ('not_sent', 'sent')
+            WHERE recurring_fee_id=? AND status IN ('not_sent', 'sent') AND invoice_id IS NULL
             ORDER BY due_date ASC LIMIT 1
         """, (fee_id,))
         pe_row = c.fetchone()
@@ -1812,6 +2120,10 @@ def generate_invoice_from_recurring(fee_id: int):
             c.execute("UPDATE payment_events SET invoice_id=? WHERE id=?", (invoice_id, pe_row[0]))
 
         conn.commit()
+
+        source_logo_dir = os.path.join("results", f"invoice_{prev_invoice_id}") if prev_invoice_id else None
+        _render_invoice_pdf(conn, invoice_id, source_logo_dir=source_logo_dir)
+
         return {"invoice_id": invoice_id, "invoice_number": invoice_number}
 
 @app.get("/todos")
